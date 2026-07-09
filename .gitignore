@@ -1,0 +1,6 @@
+.reference/
+coverage
+coverage.out
+*.test
+bin/
+.rehamr/

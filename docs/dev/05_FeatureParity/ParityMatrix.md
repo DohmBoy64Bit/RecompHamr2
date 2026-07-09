@@ -1,0 +1,25 @@
+# Parity Matrix
+
+| Area | Status | Evidence |
+|---|---|---|
+| Phase 0 source inventory | complete | Reference commit `259a450e93af48437ee23663e5ca66cdc1ab8569`; `internal/parity`; `RecompHamr1Inventory.md`; `ParityClosure.md`. |
+| Governance docs | present | `AGENTS.md`, `docs/dev/00_Governance/`, `docs/dev/02_Verification/`. |
+| Diagnostic skeleton | present | `cmd/recomphamr`, `internal/app`. |
+| Config/workspace and memory | implemented subset | `internal/config`, `internal/project`, `internal/llm`, `internal/agent`, `internal/app`, tests, `ConfigParity.md`, `MemoryParity.md`, user docs; memory loading, loop injection, bare startup memory status reporting, and fake-runtime memory smoke are covered, while real backend turns that consume startup memory remain unsupported. |
+| LLM/context helpers | implemented | `internal/llm`, tests, `ContextPacking.md`, `Protocols.md`, `ErrorHandling.md`; reference evidence from RecompHamr 1.x `internal/llm`, `internal/ctx`, and `internal/cloud`. |
+| Built-in tools | implemented | `internal/tools`, tests, `ToolParity.md`, `ToolRuntime.md`, `docs/user/tools.md`; primary shell schema is `powershell` with `bash` as a 1.x compatibility alias. |
+| Agent loop | implemented | `internal/agent`, tests, `AgentLoop.md`; model-tool pairing, cancellation, failure nudges, runaway nudges, empty-reply retry, and verification nudge are covered. |
+| TUI shell contract | implemented | `internal/tui`, tests, `TUIArchitecture.md`, `TUIParity.md`; initiative layout, Bubble Tea adapter, prompt editor, status/footer, completion, paste chips, history, cancellation, quit, compact/wide renders, and debug redaction are covered. |
+| Slash commands | implemented | `internal/commands`, tests, `CommandParity.md`, `docs/user/commands.md`; all 11 parity commands have registry metadata, generated help, examples, side effects, explicit error classes, and Phase 9 `/skill-new` fetch/cache wiring. |
+| Skills | implemented | `internal/skills`, embedded parity data, `SkillParity.md`, `docs/user/skills.md`; 28 embedded skills, custom precedence, active listing, audit, skill-new draft, scaffold helper, and command fetch/cache flow are covered. |
+| MCP protocol foundation | implemented | `internal/mcp`, `MCPParity.md`, `MCPArchitecture.md`, `Protocols.md`; JSON-RPC types, initialize/tools payloads, stdio injected-stream transport, streamable HTTP request/response transport, and fake transport tests are covered. |
+| MCP manager runtime | implemented | `internal/mcp`, `internal/commands`, `MCPParity.md`, `docs/user/mcp.md`; manager lifecycle, HTTP connector, tool allowlists, skill gating, full tool calls, and manager-backed `/mcp` command dispatch are covered. |
+| Doctor diagnostics | implemented | `internal/doctor`, command dispatch, `DoctorParity.md`, `docs/user/doctor.md`; offline local diagnostics and operational file validation are covered. |
+| Release verification | implemented | `internal/release`, `internal/update`, installer scripts, `.goreleaser.yaml`, devcontainer, CI workflow, `ReleaseParity.md`, `docs/user/install.md`; artifact names, local binary builds, local archive creation, local SHA256 manifest generation/verification, operational file validation, and self-update dry-run planning are covered, while remote downloads and installer execution tests remain unsupported. |
+| Product runtime | implemented subset | Bare startup composes local config, optional memory, slash command environment, MCP manager state, and pure TUI state through `internal/app`; deterministic fake-runtime smoke covers slash command dispatch, prompt/tool loop, cancellation, memory injection, and transcript rendering. Real backend turns, real tool execution, MCP autoconnect, and Bubble Tea process launch remain unsupported. |
+| Phase 19 parity closure | complete | `ParityClosure.md` audits each top-level parity area as passed, partial, or blocked with local source, docs, tests, and verified remaining limits. |
+| Phase 20 security audit | complete | `SecurityAudit.md`, `internal/project` symlink regressions, updated security docs, and `make verify`; direct memory/status reads now refuse symlinked workspace and memory paths. |
+| Phase 21 documentation coverage | complete | `internal/docscheck` mechanically verifies required docs, user-visible terms, and exported Go doc comments; docscheck tests hold 100% statement coverage. |
+| Phase 22 cross-platform validation | complete | `PlatformMatrix.md` validates Windows-first shell behavior, Linux/macOS release targets, path/permission caveats, cancellation evidence, installer script validation, TUI render portability, and explicit unsupported limits. |
+| Phase 23 performance baseline | complete | `PerformanceBenchmarks.md` records deterministic local benchmarks for context packing, TUI rendering, MCP listing, tool overhead, and startup composition on `windows/amd64`. |
+| Phase 24 user walkthrough and migration | complete | `docs/user/walkthrough.md` and `docs/user/migration.md` document fresh-clone setup, config/model profile setup, memory, skills, tools, MCP, doctor, troubleshooting, 1.x migration, and verified unsupported limits. |
