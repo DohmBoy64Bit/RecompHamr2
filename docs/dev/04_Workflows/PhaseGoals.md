@@ -377,3 +377,23 @@ Verification commands: `make verify`; `go run ./cmd/recomphamr --diagnostic`;
 placeholder-policy scan.
 Stop condition: blocked if any RC claim requires a tag, upload, remote network
 metadata, installer execution, or unsupported runtime behavior.
+
+## Next 20 Phase 26: RC Soak And Bugfix Freeze
+
+Outcome: RC soak and bugfix freeze rules are documented, local repeated
+verification evidence is recorded, and the roadmap advances without adding
+features.
+Scope: `RCSoak.md`, docs index, phase goals, roadmap, parity, traceability,
+status, known limits, diagnostic evidence, repeated verification commands,
+placeholder-policy scan, and docs hash comparison.
+Out of scope: feature work, published artifacts, remote downloads, automatic
+binary replacement, installer execution claims on every platform, and stable
+release publication.
+Evidence required: soak/freeze ledger, repeated `make verify` evidence,
+diagnostic output, targeted release/update/doctor coverage, placeholder-policy
+scan, traceability and status rows, and docs hash comparison.
+Verification commands: `make verify` twice; `go run ./cmd/recomphamr
+--diagnostic`; `go test ./internal/release ./internal/update ./internal/doctor
+-cover`; placeholder-policy scan.
+Stop condition: blocked if any verification failure cannot be reproduced,
+classified, and tied to a release blocker without adding feature scope.

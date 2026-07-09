@@ -24,3 +24,4 @@
 | Phase 23 performance baseline | complete | `PerformanceBenchmarks.md` records deterministic local benchmarks for context packing, TUI rendering, MCP listing, tool overhead, and startup composition on `windows/amd64`. |
 | Phase 24 user walkthrough and migration | complete | `docs/user/walkthrough.md` and `docs/user/migration.md` document fresh-clone setup, config/model profile setup, memory, skills, tools, MCP, doctor, troubleshooting, 1.x migration, and verified unsupported limits. |
 | Phase 25 release candidate preparation | complete for local RC prep | `ReleaseCandidate.md`, `KnownLimits.md`, user RC notes, changelog, release criteria, and release workflow docs define local RC scope, checksum guidance, packaged docs, and unsupported publishing limits. |
+| Phase 26 RC soak and bugfix freeze | complete for local soak | `RCSoak.md` documents freeze rules, repeated verification matrix, blocker policy, and no-feature stabilization boundaries. |

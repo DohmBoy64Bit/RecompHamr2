@@ -36,4 +36,4 @@ success paths.
 
 Current local evidence is `make verify`, diagnostic output, release package
 tests, `PlatformMatrix.md`, `PerformanceBenchmarks.md`, `SecurityAudit.md`,
-`ParityClosure.md`, and this file.
+`ParityClosure.md`, `RCSoak.md`, and this file.
