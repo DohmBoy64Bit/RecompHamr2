@@ -1,7 +1,9 @@
 # Stable Release Gate
 
 Phase 27 records stable-release readiness for the local checkout at commit
-`6a095dc`. This is a local gate record, not a published stable release.
+`6a095dc`, plus local artifact, checksum, and Windows installer smoke evidence
+generated after commit `95269b3`. This is a local gate record, not a published
+stable release.
 
 ## Local Gate Result
 
@@ -23,21 +25,41 @@ The local gate covers:
 - diagnostic output;
 - known-limits and RC soak docs.
 
+## Local Artifact Evidence
+
+Local release artifacts were generated under `dist/` for:
+
+- `recomphamr_windows_amd64.zip`
+- `recomphamr_windows_arm64.zip`
+- `recomphamr_linux_amd64.tar.gz`
+- `recomphamr_linux_arm64.tar.gz`
+- `recomphamr_darwin_amd64.tar.gz`
+- `recomphamr_darwin_arm64.tar.gz`
+
+`dist/SHA256SUMS` was generated from those six archives and each manifest entry
+was verified locally with `Get-FileHash -Algorithm SHA256`.
+
+Windows installer smoke evidence:
+
+```powershell
+.\scripts\install.ps1 -ReleaseDir .\dist -InstallDir <temp-install-dir> -Artifact recomphamr_windows_amd64.zip
+& <temp-install-dir>\recomphamr.exe --diagnostic
+```
+
+The smoke installed `recomphamr.exe` into a temporary directory and the
+installed binary printed diagnostic output successfully.
+
 ## Blocked Publication Conditions
 
 Stable release publication remains `blocked:` until the release owner records:
 
 - an intentional stable tag decision;
-- generated release artifacts for supported targets;
-- `SHA256SUMS` generated from those artifacts;
-- checksum verification of the generated artifacts;
-- fresh-install validation evidence;
 - external CI or platform matrix evidence where required;
 - publication destination and upload evidence.
 
-No published stable release, uploaded artifact, remote download, remote checksum
-fetch, automatic replacement, or platform-wide installer execution claim exists
-in this checkout.
+No published stable release, stable tag, uploaded artifact, remote download,
+remote checksum fetch, automatic replacement, external CI result, or
+platform-wide installer execution claim exists in this checkout.
 
 ## Post-Parity Feature Gate
 

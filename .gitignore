@@ -4,3 +4,6 @@ coverage.out
 *.test
 bin/
 .rehamr/
+dist/
+.tmp-go-build/
+.tmp-go-cache/

@@ -24,8 +24,10 @@ success paths.
 - Automatic replacement of the running executable is `unsupported`.
 - Installer execution tests on every platform are `unsupported`.
 - Dependency audit remains `unsupported`.
-- Stable release publication is `blocked:` until tag, artifact, checksum,
-  fresh-install, external platform, and upload evidence exist.
+- Stable release publication is `blocked:` until stable tag, external platform,
+  upload, and publication destination evidence exist. Local artifact,
+  checksum, and Windows installer smoke evidence are recorded in
+  `StableRelease.md`.
 
 ## Platform Limits
 
