@@ -33,8 +33,8 @@ Record both names in goal packets, traceability rows, and status reports.
 | 22 | Cross-Platform Validation | Workflow Phase 13 platform validation | complete |
 | 23 | Performance And Local-First Budgeting | Workflow Phase 13 performance baseline | complete |
 | 24 | User Walkthrough And Migration Guide | Workflow Phase 14 release candidate prep | complete |
-| 25 | Release Candidate | Workflow Phase 14 | next |
-| 26 | RC Soak And Bugfix Freeze | Workflow Phase 14 stabilization | pending |
+| 25 | Release Candidate | Workflow Phase 14 | complete for local RC prep |
+| 26 | RC Soak And Bugfix Freeze | Workflow Phase 14 stabilization | next |
 | 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | pending |
 | 28 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until stable release |
 | 29 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until stable release |
@@ -118,7 +118,10 @@ verified behavior and explicit `unsupported` runtime/release boundaries.
 
 Produce the release candidate branch/tag artifacts, release notes, checksums,
 packaged docs, and final known-limits document. Only parity fixes and
-documentation corrections are allowed after this point.
+documentation corrections are allowed after this point. In this checkout, Phase
+25 closes as local RC preparation: release notes, checksum guidance,
+packaged-docs list, and known-limits docs are complete, while published tags,
+uploaded artifacts, and remote downloads remain `unsupported`.
 
 ### Phase 26 — RC Soak And Bugfix Freeze
 

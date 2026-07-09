@@ -34,5 +34,8 @@ Verified unsupported release limits:
 - remote checksum fetching;
 - automatic replacement of the running executable;
 - installer execution tests on every platform;
-- dependency audit;
-- migration guide and release notes.
+- dependency audit.
+
+Phase 25 RC preparation adds local release notes and known-limits docs, but it
+does not publish tags, upload artifacts, fetch remote checksums, or execute
+installers on every platform.

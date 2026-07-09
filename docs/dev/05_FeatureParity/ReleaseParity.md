@@ -51,7 +51,9 @@ Implemented Phase 12 checksum slice:
 - `internal/update.PlanLocal` verifies a local artifact against `SHA256SUMS`
   and returns a self-update dry-run plan without replacing the executable.
 
-Still `unsupported`: release downloads, remote checksum fetching, automatic
-replacement of the running executable, and platform installer execution tests.
+Phase 25 RC preparation adds local release-candidate notes and a known-limits
+ledger. Still `unsupported`: release downloads, remote checksum fetching,
+automatic replacement of the running executable, published artifact upload, and
+platform installer execution tests.
 
 Verification evidence: `go test ./internal/release -cover` and `make verify`.

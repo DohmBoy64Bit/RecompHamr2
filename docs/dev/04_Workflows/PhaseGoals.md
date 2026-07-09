@@ -357,3 +357,23 @@ Verification commands: `make verify`; `go run ./cmd/recomphamr --diagnostic`;
 placeholder-policy scan.
 Stop condition: blocked if a walkthrough step cannot be tied to current docs,
 source, tests, runtime output, or an explicit `unsupported` limit.
+
+## Next 20 Phase 25: Release Candidate
+
+Outcome: release-candidate preparation docs, release notes, checksum guidance,
+packaged-docs list, and verified known limits are current without pretending a
+published RC exists.
+Scope: `ReleaseCandidate.md`, `KnownLimits.md`, user RC notes, changelog,
+release workflow, release criteria, docs index, parity, traceability, status,
+docs hashes, diagnostic evidence, and full verification evidence.
+Out of scope: published tags, uploaded artifacts, remote release downloads,
+remote checksum fetching, automatic executable replacement, installer execution
+claims on every platform, and dependency audit.
+Evidence required: RC preparation docs, known-limits ledger, changelog entry,
+checksum guidance, packaged-docs list, traceability and status rows, docs hash
+comparison, placeholder-policy scan, diagnostic output, and `make verify`.
+Verification commands: `make verify`; `go run ./cmd/recomphamr --diagnostic`;
+`go test ./internal/release ./internal/update ./internal/doctor -cover`;
+placeholder-policy scan.
+Stop condition: blocked if any RC claim requires a tag, upload, remote network
+metadata, installer execution, or unsupported runtime behavior.
