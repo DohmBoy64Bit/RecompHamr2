@@ -35,7 +35,7 @@ Record both names in goal packets, traceability rows, and status reports.
 | 24 | User Walkthrough And Migration Guide | Workflow Phase 14 release candidate prep | complete |
 | 25 | Release Candidate | Workflow Phase 14 | complete for local RC prep |
 | 26 | RC Soak And Bugfix Freeze | Workflow Phase 14 stabilization | complete for local soak |
-| 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | next |
+| 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | blocked pending publication evidence |
 | 28 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until stable release |
 | 29 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until stable release |
 
@@ -134,7 +134,10 @@ documented in `RCSoak.md`, and stable release remains gated on Phase 27.
 
 Cut the stable release when all parity, docs, coverage, security, install, and
 smoke gates pass. Publish artifacts only after checksum verification and
-fresh-install validation.
+fresh-install validation. In this checkout, Phase 27 records local stable-gate
+readiness in `StableRelease.md`; publication remains `blocked:` because no
+stable tag, uploaded artifacts, generated release `SHA256SUMS`, fresh-install
+evidence, or publication evidence exists locally.
 
 ### Phase 28 — Post-Parity Feature Intake
 

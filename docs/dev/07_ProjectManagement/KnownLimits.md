@@ -18,12 +18,14 @@ success paths.
 ## Release Limits
 
 - Published tags and uploaded release artifacts are `unsupported` until the RC
-  gate is intentionally cut.
+  or stable publication gate is intentionally cut.
 - Remote release downloads are `unsupported`.
 - Remote checksum fetching is `unsupported`.
 - Automatic replacement of the running executable is `unsupported`.
 - Installer execution tests on every platform are `unsupported`.
 - Dependency audit remains `unsupported`.
+- Stable release publication is `blocked:` until tag, artifact, checksum,
+  fresh-install, external platform, and upload evidence exist.
 
 ## Platform Limits
 
@@ -36,4 +38,4 @@ success paths.
 
 Current local evidence is `make verify`, diagnostic output, release package
 tests, `PlatformMatrix.md`, `PerformanceBenchmarks.md`, `SecurityAudit.md`,
-`ParityClosure.md`, `RCSoak.md`, and this file.
+`ParityClosure.md`, `RCSoak.md`, `StableRelease.md`, and this file.

@@ -397,3 +397,24 @@ Verification commands: `make verify` twice; `go run ./cmd/recomphamr
 -cover`; placeholder-policy scan.
 Stop condition: blocked if any verification failure cannot be reproduced,
 classified, and tied to a release blocker without adding feature scope.
+
+## Next 20 Phase 27: RecompHamr 2.0 Stable Release
+
+Outcome: local stable-release readiness is documented with verification
+evidence, and external publication remains explicitly blocked until tag,
+artifact, checksum, install, and publication evidence exists.
+Scope: `StableRelease.md`, docs index, phase goals, roadmap, parity,
+traceability, status, release criteria, known limits, diagnostic evidence,
+release/update/doctor coverage, placeholder-policy scan, and docs hash
+comparison.
+Out of scope: creating or publishing stable tags, uploading artifacts, remote
+downloads, remote checksum fetching, automatic binary replacement, installer
+execution claims on every platform, and opening post-parity feature intake.
+Evidence required: local stable-gate docs, `make verify`, diagnostic output,
+release/update/doctor coverage, tag/status evidence, placeholder-policy scan,
+traceability and status rows, and docs hash comparison.
+Verification commands: `make verify`; `go run ./cmd/recomphamr --diagnostic`;
+`go test ./internal/release ./internal/update ./internal/doctor -cover`; `git
+tag --list`; placeholder-policy scan.
+Stop condition: blocked if stable publication would require external artifact,
+tag, checksum, install, CI, or upload evidence that is not present locally.
