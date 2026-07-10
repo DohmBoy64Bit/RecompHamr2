@@ -1,7 +1,7 @@
 # Stable Release Gate
 
 Phase 27 records stable-release readiness and publication evidence for
-RecompHamr 2.0.0. The current published tag points at commit `71b8364`, and the
+RecompHamr 2.0.0. The current published tag points at commit `8d96724`, and the
 GitHub release is public at
 `https://github.com/DohmBoy64Bit/RecompHamr2/releases/tag/v2.0.0`.
 
@@ -81,14 +81,14 @@ External publication is verified for `v2.0.0`:
 
 - repository: `https://github.com/DohmBoy64Bit/RecompHamr2`;
 - remote: `origin https://github.com/DohmBoy64Bit/RecompHamr2.git`;
-- published commit: `71b8364`;
+- published commit: `8d96724`;
 - tag: `v2.0.0`;
 - release URL:
   `https://github.com/DohmBoy64Bit/RecompHamr2/releases/tag/v2.0.0`;
 - CI URL:
-  `https://github.com/DohmBoy64Bit/RecompHamr2/actions/runs/29095767518`;
+  `https://github.com/DohmBoy64Bit/RecompHamr2/actions/runs/29096150903`;
 - additional successful verify run:
-  `https://github.com/DohmBoy64Bit/RecompHamr2/actions/runs/29095766548`;
+  `https://github.com/DohmBoy64Bit/RecompHamr2/actions/runs/29096149468`;
 - publication timestamp: `2026-07-10T13:19:48Z`;
 - checksum URL:
   `https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/SHA256SUMS`;
@@ -108,7 +108,7 @@ Uploaded artifacts:
 ## Local Stable Tag Decision
 
 The stable tag is `v2.0.0`. The tag was force-updated from local evidence onto
-commit `71b8364` after the portable CI test fix and pushed to `origin`.
+commit `8d96724` after the portable CI test fix and pushed to `origin`.
 
 ## Blocked Publication Conditions
 

@@ -57,7 +57,7 @@ Implemented Phase 12 checksum slice:
 
 Phase 25 RC preparation adds local release-candidate notes and a known-limits
 ledger. Phase 27/35 publication repair created the public GitHub repository,
-pushed commit `71b8364`, published tag `v2.0.0`, uploaded six archives and
+pushed commit `8d96724`, published tag `v2.0.0`, uploaded six archives and
 `SHA256SUMS`, and recorded successful `verify` CI. Still `unsupported`: remote
 checksum fetching inside the app, automatic replacement of the running
 executable, dependency audit, and platform-wide installer execution tests.
