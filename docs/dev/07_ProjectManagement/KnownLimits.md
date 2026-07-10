@@ -6,14 +6,16 @@ success paths.
 
 ## Runtime Limits
 
-- Real backend prompt/model turns are `unsupported` in product runtime.
-- Real product-runtime tool execution is `unsupported`.
+- Real backend prompt/model turns are `unsupported` in product runtime until
+  Phase 28 live end-user runtime integration closes.
+- Real product-runtime tool execution is `unsupported` until Phase 28 wires
+  tool dispatch with cancellation and documented status.
 - MCP autoconnect is `unsupported`.
 - Stdio MCP process spawning is `unsupported`.
 - Persistent user MCP config files beyond current documented metadata are
   `unsupported`.
-- Interactive Bubble Tea process launch is `unsupported`; current TUI coverage
-  is the pure model and adapter tests.
+- Interactive Bubble Tea process launch is `unsupported` until Phase 28;
+  current TUI coverage is the pure model and adapter tests.
 
 ## Release Limits
 

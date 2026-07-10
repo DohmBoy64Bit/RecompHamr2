@@ -67,10 +67,12 @@ No uploaded artifact, remote download, remote checksum fetch, automatic
 replacement, external CI result, publication destination, or platform-wide
 installer execution claim exists in this checkout.
 
-## Post-Parity Feature Gate
+## Corrective Runtime And Post-Parity Feature Gate
 
-Post-parity feature intake remains blocked until stable publication evidence is
-recorded. Local readiness alone does not open Phase 28 feature planning.
+Phase 28 is now the corrective live end-user runtime integration phase.
+Post-parity feature intake moves to Phase 29 and remains blocked until Phase 28
+closes and stable publication evidence is recorded. Local readiness alone does
+not open feature planning.
 
 ## Release Owner Checklist
 

@@ -36,7 +36,7 @@ or `blocked:` rather than pretending success.
 | MCP manager runtime | partial | Manager lifecycle, streamable HTTP connector, tool gating, and `/mcp` command dispatch are covered. Stdio process spawning, app autoconnect, persistent user MCP config files, and agent-loop MCP exposure remain unsupported. |
 | Doctor diagnostics | passed | Offline diagnostics and operational file validation are covered. |
 | Release verification | partial | Local build/archive/checksum/install-script/dry-run behavior is covered. Remote downloads, remote checksum fetching, automatic binary replacement, and platform installer execution tests remain unsupported. |
-| Product runtime | partial | Bare startup and deterministic fake-runtime smoke are covered. Real backend prompt turns, real tool execution, MCP autoconnect, and Bubble Tea process launch remain unsupported. |
+| Product runtime | partial | Bare startup and deterministic fake-runtime smoke are covered. Real backend prompt turns, real tool execution, MCP autoconnect, and Bubble Tea process launch remain unsupported until the corrective Phase 28 live end-user runtime integration closes. |
 
 ## Verification
 

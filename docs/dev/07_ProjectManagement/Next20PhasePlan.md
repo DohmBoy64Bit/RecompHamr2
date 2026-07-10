@@ -36,8 +36,9 @@ Record both names in goal packets, traceability rows, and status reports.
 | 25 | Release Candidate | Workflow Phase 14 | complete for local RC prep |
 | 26 | RC Soak And Bugfix Freeze | Workflow Phase 14 stabilization | complete for local soak |
 | 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | partially satisfied; blocked pending publication evidence |
-| 28 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until stable release |
-| 29 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until stable release |
+| 28 | Live End-User Runtime Integration | Corrective runtime integration phase | next; blocks feature intake |
+| 29 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until Phase 28 and stable publication |
+| 30 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until Phase 29 intake |
 
 ## Global Gates
 
@@ -141,14 +142,27 @@ decision is `v2.0.0`; publication remains `blocked:` because no external
 CI/platform evidence, uploaded artifact evidence, or publication destination
 evidence exists locally.
 
-### Phase 28 — Post-Parity Feature Intake
+### Phase 28 — Live End-User Runtime Integration
 
-Open feature planning after stable release. Create a decision register for
-candidate enhancements such as safer permission prompts, session export/import,
-richer reverse-engineering dashboards, ACP/editor integration, and optional
-desktop shell.
+Correct the runtime integration gap by making `recomphamr` launch the usable
+terminal app instead of only printing a startup summary. Wire the Bubble Tea
+program loop, prompt submission, slash command dispatch, real LLM client,
+agent loop, built-in tool dispatcher, cancellation, status updates, debug
+redaction, and graceful quit path into the CLI while preserving strict package
+boundaries. This is parity repair, not new feature intake.
 
-### Phase 29 — Extension Architecture Planning
+Phase 28 closes only when a user can run the CLI, see the TUI, run slash
+commands, submit a prompt through the agent loop, cancel work, and exit cleanly
+with tests, docs, help text, security notes, and 100% statement coverage.
+
+### Phase 29 — Post-Parity Feature Intake
+
+Open feature planning after live runtime integration and stable publication.
+Create a decision register for candidate enhancements such as safer permission
+prompts, session export/import, richer reverse-engineering dashboards,
+ACP/editor integration, and optional desktop shell.
+
+### Phase 30 — Extension Architecture Planning
 
 Design post-parity extension boundaries for optional Rust helpers, external
 analyzers, plugin-style tools, richer MCP integrations, and future UI surfaces.
@@ -178,9 +192,12 @@ No implementation begins until each feature has its own approved goal packet.
 
 ## Assumptions
 
-- "Next 20 phases" means phases 10 through 29 after completed Phase 9.
+- "Next 20 phases" now means the reconciled forward plan from phases 10
+  through 30 after completed Phase 9; Phase 28 was inserted as a corrective
+  runtime integration phase, moving the previous phases 28 and 29 to phases 29
+  and 30.
 - Go remains the implementation language and `make verify` remains canonical.
 - Windows remains the primary target, with Linux/macOS validated where scripts
   and CI are available.
-- No post-parity feature work begins before the stable Phase 27 release gate
-  passes.
+- No post-parity feature work begins before Phase 28 live runtime integration
+  and stable publication evidence both pass.

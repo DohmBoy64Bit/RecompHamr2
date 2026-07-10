@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- No post-parity feature intake is open until stable publication evidence is
-  recorded.
+- No post-parity feature intake is open until Phase 28 live runtime integration
+  and stable publication evidence are complete.
 
 ## v2.0.0
 

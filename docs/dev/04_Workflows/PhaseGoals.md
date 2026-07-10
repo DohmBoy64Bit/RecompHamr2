@@ -424,3 +424,62 @@ tag --list`; placeholder-policy scan.
 Stop condition: blocked if stable publication would require external
 CI/platform, upload, or publication destination evidence that is not present
 locally.
+
+## Next 20 Phase 28: Live End-User Runtime Integration
+
+Outcome: running `recomphamr` launches a usable Bubble Tea terminal app that
+connects prompt input, slash commands, the agent loop, the OpenAI-compatible LLM
+client, built-in tool dispatch, cancellation, status rendering, and clean quit
+behavior without violating package boundaries.
+Scope: `cmd/recomphamr`, `internal/app`, `internal/tui`, `internal/agent`,
+`internal/llm`, `internal/tools`, `internal/commands`, user runtime docs,
+TUI/runtime architecture docs, parity/status/traceability rows, help text,
+security notes, golden render tests, command-flow tests, fake backend tests,
+and live-program launch tests where locally possible.
+Out of scope: new post-parity features, desktop UI, MCP autoconnect, stdio MCP
+process spawning, remote release publishing, external CI claims, or unbounded
+tool execution without cancellation and documented user-visible status.
+Evidence required: live TUI launch evidence, slash command execution from the
+live runtime, prompt-to-agent-loop evidence with fake and configurable real
+provider paths, tool dispatch tests, cancellation tests, docs hash comparison,
+100% statement coverage, docs/help/docstring coverage, and explicit security
+boundaries for real local tool execution.
+Verification commands: `go test ./cmd/recomphamr ./internal/app
+./internal/tui ./internal/agent ./internal/llm ./internal/tools
+./internal/commands -cover`; `make verify`; `go run ./cmd/recomphamr --help`;
+manual or scripted TUI smoke with documented terminal constraints.
+Stop condition: blocked if live runtime requires undocumented network access,
+unbounded local command execution, fake success paths, package-boundary
+violations, or terminal behavior that cannot be verified locally.
+
+## Next 20 Phase 29: Post-Parity Feature Intake
+
+Outcome: after Phase 28 and stable publication evidence pass, candidate
+post-parity features are registered with evidence, risk, user value,
+configuration/docs impact, and explicit approval requirements.
+Scope: decision register, feature intake criteria, docs impact matrix,
+security/risk notes, user-visible examples, and phase goal packets for any
+approved feature candidates.
+Out of scope: implementing new features before approval, reopening parity
+scope, or bypassing live runtime and publication gates.
+Evidence required: current stable publication evidence, Phase 28 closure
+evidence, intake register, traceability rows, status report, docs hashes, and
+`make verify`.
+Verification commands: `make verify`; docs coverage check; decision-register
+review.
+Stop condition: blocked if Phase 28 or stable publication evidence is missing.
+
+## Next 20 Phase 30: Extension Architecture Planning
+
+Outcome: approved post-parity extension boundaries are designed without
+implementation, with package boundaries, protocol contracts, configuration
+docs, security rules, and test strategy recorded.
+Scope: optional Rust helpers, external analyzers, plugin-style tools, richer
+MCP integrations, future UI surfaces, ADRs, architecture docs, config examples,
+and traceability rows.
+Out of scope: implementation before each extension has an approved goal packet.
+Evidence required: approved Phase 29 intake item, ADR or architecture doc,
+config/help/docs coverage plan, security analysis, and `make verify`.
+Verification commands: `make verify`; docs coverage check; architecture review.
+Stop condition: blocked if an extension lacks approved intake evidence or would
+violate separation of concerns.
