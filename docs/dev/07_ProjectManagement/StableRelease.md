@@ -1,9 +1,9 @@
 # Stable Release Gate
 
-Phase 27 records stable-release readiness for the local checkout at commit
-`6a095dc`, plus local artifact, checksum, Windows installer smoke, and local
-stable tag decision evidence generated after commit `95269b3`. This is a local
-gate record, not an uploaded or externally published stable release.
+Phase 27 records stable-release readiness and publication evidence for
+RecompHamr 2.0.0. The current published tag points at commit `71b8364`, and the
+GitHub release is public at
+`https://github.com/DohmBoy64Bit/RecompHamr2/releases/tag/v2.0.0`.
 
 ## Local Gate Result
 
@@ -75,34 +75,48 @@ Observed evidence:
   `93e5c0f8dbbf90b4c1423a45f239d0f085a1a4e14e91a5aa6f0fb58df8065218`;
 - local `SHA256SUMS` verification result: `True`.
 
+## Stable Publication Evidence
+
+External publication is verified for `v2.0.0`:
+
+- repository: `https://github.com/DohmBoy64Bit/RecompHamr2`;
+- remote: `origin https://github.com/DohmBoy64Bit/RecompHamr2.git`;
+- published commit: `71b8364`;
+- tag: `v2.0.0`;
+- release URL:
+  `https://github.com/DohmBoy64Bit/RecompHamr2/releases/tag/v2.0.0`;
+- CI URL:
+  `https://github.com/DohmBoy64Bit/RecompHamr2/actions/runs/29095767518`;
+- additional successful verify run:
+  `https://github.com/DohmBoy64Bit/RecompHamr2/actions/runs/29095766548`;
+- publication timestamp: `2026-07-10T13:19:48Z`;
+- checksum URL:
+  `https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/SHA256SUMS`;
+- primary Windows artifact URL:
+  `https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/recomphamr_windows_amd64.zip`.
+
+Uploaded artifacts:
+
+- `recomphamr_windows_amd64.zip`
+- `recomphamr_windows_arm64.zip`
+- `recomphamr_linux_amd64.tar.gz`
+- `recomphamr_linux_arm64.tar.gz`
+- `recomphamr_darwin_amd64.tar.gz`
+- `recomphamr_darwin_arm64.tar.gz`
+- `SHA256SUMS`
+
 ## Local Stable Tag Decision
 
-The local stable tag decision is `v2.0.0`. The tag must be created only after
-the release-memory docs are committed and `make verify` passes for that commit.
-This tag is local evidence until it is pushed or otherwise published with the
-release artifacts.
+The stable tag is `v2.0.0`. The tag was force-updated from local evidence onto
+commit `71b8364` after the portable CI test fix and pushed to `origin`.
 
 ## Blocked Publication Conditions
 
-Stable release publication remains `blocked:` until the release owner records:
-
-- external CI or platform matrix evidence where required;
-- publication destination and upload evidence;
-- external artifact and checksum URLs.
-
-No uploaded artifact, remote download, remote checksum fetch, automatic
-replacement, external CI result, publication destination, or platform-wide
-installer execution claim exists in this checkout.
-
-Local inspection with `git remote -v` produced no remote output during Phase
-34, so external publication remains `blocked:` until a release owner supplies
-hosted evidence.
-
-Phase 35 gate audit found local `HEAD` `6b17cf2`, local tag `v2.0.0`, 13 local
-`dist/` entries, and local `dist/SHA256SUMS`, but `git remote -v` produced no
-output and `gh release view v2.0.0` returned `no git remotes found`. This is
-not stable publication evidence because there is still no external artifact
-URL, checksum URL, CI URL, or publication timestamp.
+The previous publication blocker is resolved for `v2.0.0`: external
+repository, release, artifact, checksum, CI, and publication timestamp evidence
+now exist. Still unsupported: automatic replacement of the running executable,
+remote checksum fetching inside the app, dependency audit, and installer
+execution tests on every platform.
 
 `internal/release.ValidatePublicationEvidence` validates the required
 publication fields without claiming an upload: version, commit, external CI URL,
@@ -116,9 +130,9 @@ Phase 28 is the corrective live end-user runtime integration phase. Phase 29 is
 the corrective live MCP agent integration phase. Phases 30-34 are corrective
 TUI and Windows executable hardening. Post-parity feature intake moves to Phase
 35 and remains blocked until Phase 28, Phase 29, corrective TUI hardening,
-local `.exe` launch polish, and stable publication evidence are recorded. Local
-readiness alone does not open feature planning. The Phase 35 gate audit did not
-open feature intake because publication evidence is still missing.
+local `.exe` launch polish, and stable publication evidence are recorded. The
+publication evidence gate is now satisfied for `v2.0.0`; Phase 35 feature
+intake may open only through its documented intake criteria.
 
 ## Release Owner Checklist
 

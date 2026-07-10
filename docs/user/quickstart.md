@@ -50,5 +50,9 @@ Use the non-interactive flags first when validating a new build. `--summary`
 prints runtime composition evidence and `--diagnostic` prints offline status;
 running without flags opens the TUI.
 
-Published `.exe` downloads remain blocked until external release publication
-evidence exists.
+Published Windows archives are available from the `v2.0.0` release:
+
+```text
+https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/recomphamr_windows_amd64.zip
+https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/SHA256SUMS
+```

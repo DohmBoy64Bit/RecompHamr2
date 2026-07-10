@@ -35,15 +35,15 @@ Record both names in goal packets, traceability rows, and status reports.
 | 24 | User Walkthrough And Migration Guide | Workflow Phase 14 release candidate prep | complete |
 | 25 | Release Candidate | Workflow Phase 14 | complete for local RC prep |
 | 26 | RC Soak And Bugfix Freeze | Workflow Phase 14 stabilization | complete for local soak |
-| 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | partially satisfied; blocked pending publication evidence |
-| 28 | Live End-User Runtime Integration | Corrective runtime integration phase | complete locally; feature intake still blocked by stable publication evidence |
-| 29 | Live MCP Agent Integration | Corrective MCP runtime integration phase | complete locally; stdio/persistent-config correction complete; feature intake still blocked by stable publication evidence |
+| 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | complete for `v2.0.0` publication |
+| 28 | Live End-User Runtime Integration | Corrective runtime integration phase | complete |
+| 29 | Live MCP Agent Integration | Corrective MCP runtime integration phase | complete; stdio/persistent-config correction complete |
 | 30 | TUI Reference And Parity Specification | Corrective TUI hardening | complete |
 | 31 | TUI Visual System And Responsive Layout | Corrective TUI hardening | complete |
 | 32 | TUI Composer, Palette, And Completion UX | Corrective TUI hardening | complete |
 | 33 | TUI Transcript, Tool Blocks, And Runtime Feedback | Corrective TUI hardening | complete |
-| 34 | Windows Executable And End-User Launch Polish | Corrective packaging/runtime hardening | complete locally; public publication still blocked |
-| 35 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until stable publication evidence |
+| 34 | Windows Executable And End-User Launch Polish | Corrective packaging/runtime hardening | complete |
+| 35 | Post-Parity Feature Intake | Workflow Phase 15 | publication gate satisfied; intake criteria still required |
 | 36 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until Phase 35 intake |
 
 ## Global Gates
@@ -141,12 +141,11 @@ documented in `RCSoak.md`, and stable release remains gated on Phase 27.
 
 Cut the stable release when all parity, docs, coverage, security, install, and
 smoke gates pass. Publish artifacts only after checksum verification and
-fresh-install validation. In this checkout, Phase 27 records local stable-gate
-readiness, generated artifacts for six targets, verified `dist/SHA256SUMS`, and
-Windows installer smoke evidence in `StableRelease.md`. The local stable tag
-decision is `v2.0.0`; publication remains `blocked:` because no external
-CI/platform evidence, uploaded artifact evidence, or publication destination
-evidence exists locally.
+fresh-install validation. Phase 27 records local stable-gate readiness,
+generated artifacts for six targets, verified `dist/SHA256SUMS`, Windows
+installer smoke evidence, external CI, uploaded artifacts, checksum URL, and
+publication timestamp in `StableRelease.md`. `v2.0.0` is published at
+`https://github.com/DohmBoy64Bit/RecompHamr2/releases/tag/v2.0.0`.
 
 ### Phase 28 — Live End-User Runtime Integration
 
@@ -261,23 +260,21 @@ install-script walkthrough, local smoke instructions, version/about output if
 needed, Start Menu/shortcut guidance if supported, and clear blocked publication
 language until hosted artifacts exist.
 
-Phase 34 is complete locally. A Windows `recomphamr.exe` was built under
+Phase 34 is complete. A Windows `recomphamr.exe` was built under
 `%TEMP%\recomphamr-phase34`, `--summary` and `--diagnostic` both ran from the
-binary, a local `recomphamr_windows_amd64.zip` archive was created, and the
-local `SHA256SUMS` row verified. Public download claims remain blocked because
-`git remote -v` produced no remote output and no external artifact/checksum/CI
-publication evidence exists.
+binary, a local `recomphamr_windows_amd64.zip` archive was created, the local
+`SHA256SUMS` row verified, and the public Windows archive is now attached to
+the `v2.0.0` GitHub release.
 
 ### Phase 35 — Post-Parity Feature Intake
 
 Open feature planning after live runtime integration, live MCP agent
 integration, corrective TUI hardening, local `.exe` launch polish, and stable
-publication evidence. This phase remains blocked until external publication
-evidence exists. The Phase 35 gate audit found only local evidence: `HEAD`
-`6b17cf2`, local tag `v2.0.0`, 13 local `dist/` entries, and local
-`dist/SHA256SUMS`. `git remote -v` produced no output and
-`gh release view v2.0.0` returned `no git remotes found`, so feature intake did
-not open.
+publication evidence. The publication gate is satisfied for `v2.0.0` by the
+GitHub release, uploaded archives, `SHA256SUMS`, and successful `verify` CI run
+recorded in `StableRelease.md`. Feature intake still requires a documented
+intake item with user value, risk, configuration/docs impact, tests, security
+notes, and explicit approval.
 Create a decision register for candidate enhancements such as safer permission
 prompts, session export/import, richer reverse-engineering dashboards,
 ACP/editor integration, and optional desktop shell.
@@ -322,5 +319,6 @@ No implementation begins until each feature has its own approved goal packet.
   and CI are available.
 - No post-parity feature work begins before Phase 28 live runtime integration,
   Phase 29 live MCP agent integration, corrective TUI hardening, local Windows
-  executable launch polish, and stable publication evidence all pass. Phase 34
-  satisfies only the local Windows executable launch polish gate.
+  executable launch polish, and stable publication evidence all pass. These
+  gates are now satisfied for `v2.0.0`; new feature work still requires Phase
+  35 intake approval.

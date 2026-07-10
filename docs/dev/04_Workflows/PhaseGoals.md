@@ -400,30 +400,29 @@ classified, and tied to a release blocker without adding feature scope.
 
 ## Next 20 Phase 27: RecompHamr 2.0 Stable Release
 
-Outcome: local stable-release readiness is documented with verification
-evidence, local artifacts/checksums/Windows installer smoke are recorded, a
-local stable tag decision is recorded when intentionally cut, and external
-publication remains explicitly blocked until external CI/platform, upload, and
-publication destination evidence exists.
+Outcome: stable-release readiness is documented with verification evidence,
+local artifacts/checksums/Windows installer smoke are recorded, a stable tag is
+published when intentionally cut, and external CI/platform, upload, checksum,
+artifact, and publication timestamp evidence are recorded when available.
 Scope: `StableRelease.md`, docs index, phase goals, roadmap, parity,
 traceability, status, release criteria, known limits, diagnostic evidence,
 release/update/doctor coverage, local release archives, generated
-`SHA256SUMS`, Windows installer smoke, local stable tag decision,
-placeholder-policy scan, and docs hash comparison.
-Out of scope: publishing stable tags, uploading artifacts, remote downloads,
-remote checksum fetching, automatic binary replacement, installer execution
-claims on every platform, external CI claims, and opening post-parity feature
-intake.
+`SHA256SUMS`, Windows installer smoke, stable tag decision, publication
+evidence, placeholder-policy scan, and docs hash comparison.
+Out of scope: remote checksum fetching inside the app, automatic binary
+replacement, installer execution claims on every platform, and opening
+post-parity feature intake without Phase 35 intake approval.
 Evidence required: local stable-gate docs, `make verify`, diagnostic output,
 release/update/doctor coverage, local artifact list, checksum verification,
-Windows installer smoke, local tag/status evidence, placeholder-policy scan,
-traceability and status rows, and docs hash comparison.
+Windows installer smoke, tag/status evidence, publication evidence when
+available, placeholder-policy scan, traceability and status rows, and docs hash
+comparison.
 Verification commands: `make verify`; `go run ./cmd/recomphamr --diagnostic`;
 `go test ./internal/release ./internal/update ./internal/doctor -cover`; `git
 tag --list`; placeholder-policy scan.
-Stop condition: blocked if stable publication would require external
-CI/platform, upload, or publication destination evidence that is not present
-locally.
+Stop condition: blocked if stable publication requires credentials, remote
+configuration, hosted artifacts, or CI evidence that cannot be produced or
+verified.
 
 ## Next 20 Phase 28: Live End-User Runtime Integration
 

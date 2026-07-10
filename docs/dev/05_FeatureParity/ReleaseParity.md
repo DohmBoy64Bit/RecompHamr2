@@ -56,10 +56,10 @@ Implemented Phase 12 checksum slice:
   `recomphamr_windows_amd64.zip`, and verified the local `SHA256SUMS` row.
 
 Phase 25 RC preparation adds local release-candidate notes and a known-limits
-ledger. Still `unsupported`: release downloads, remote checksum fetching,
-automatic replacement of the running executable, published artifact upload, and
-platform installer execution tests. Stable publication remains `blocked:` when
-no git remote, hosted artifact URL, hosted checksum URL, external CI evidence,
-or publication timestamp exists.
+ledger. Phase 27/35 publication repair created the public GitHub repository,
+pushed commit `71b8364`, published tag `v2.0.0`, uploaded six archives and
+`SHA256SUMS`, and recorded successful `verify` CI. Still `unsupported`: remote
+checksum fetching inside the app, automatic replacement of the running
+executable, dependency audit, and platform-wide installer execution tests.
 
 Verification evidence: `go test ./internal/release -cover` and `make verify`.

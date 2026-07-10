@@ -1,7 +1,7 @@
 # Fresh-Clone Walkthrough
 
-This walkthrough covers the verified RecompHamr 2.0 local path in this checkout.
-Remote release downloads remain `unsupported`.
+This walkthrough covers the verified RecompHamr 2.0 local path in this checkout
+and the published `v2.0.0` release artifacts.
 
 ## 1. Verify The Checkout
 
@@ -35,8 +35,13 @@ go build -trimpath -o .\dist\recomphamr.exe .\cmd\recomphamr
 .\dist\recomphamr.exe
 ```
 
-Release archives also use `.exe` inside Windows artifacts. Public downloadable
-artifacts remain blocked until external publication evidence exists.
+Release archives also use `.exe` inside Windows artifacts. Published Windows
+archives and checksums are available at:
+
+```text
+https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/recomphamr_windows_amd64.zip
+https://github.com/DohmBoy64Bit/RecompHamr2/releases/download/v2.0.0/SHA256SUMS
+```
 
 ## 3. Configure A Model Profile
 
