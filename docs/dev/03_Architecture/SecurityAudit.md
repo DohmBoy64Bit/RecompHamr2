@@ -16,10 +16,10 @@ not approve post-parity features.
 | File tools | passed for current scope | `read_file` caps output at 1 MiB; `write_file` and `edit_file` use owner-only writes and explicit failures; tool tests cover empty, missing, ambiguous, and write failures. |
 | Reference network fetches | passed for current scope | `recomp_reference` accepts only `http` and `https`, writes sanitized cache names under the output directory, and returns explicit fetch/read/status errors. |
 | Repository cache | passed for current scope | `repomixr` accepts only `github.com/owner/repo` style URLs and keeps clone targets inside the configured cache directory. |
-| MCP execution | partial with verified limits | MCP manager registration, streamable HTTP, skill gating, allowlists, and command dispatch are tested. Stdio process spawning, autoconnect, persistent user MCP config, and agent-loop MCP exposure remain unsupported. |
+| MCP execution | passed for current scope | MCP manager registration, streamable HTTP, stdio process spawning, persistent `.rehamr/mcp.json`, explicit autostart, skill gating, allowlists, command dispatch, and agent-loop MCP exposure are tested. Stdio commands remain security-sensitive because they execute with local user permissions. |
 | Release verification | partial with verified limits | Local build/archive/checksum/install-script/dry-run behavior is tested. Remote downloads, remote checksum fetching, automatic binary replacement, and platform installer execution remain unsupported. |
 | Secret redaction | passed for current scope | `internal/security`, `internal/logging`, and `internal/tui` tests cover configured secret redaction in logs and debug rendering. |
-| Product startup | passed for current scope | Bare startup does not call a model backend, execute tools, autoconnect MCP servers, or launch a terminal process; app tests and diagnostic output cover this boundary. |
+| Product startup | passed for current scope | Bare startup launches the terminal process but does not call a model backend or execute tools. It may autoconnect only MCP configs with explicit autostart metadata; app tests and summary output cover this boundary. |
 
 ## Verification
 

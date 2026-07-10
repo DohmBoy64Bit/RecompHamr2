@@ -20,7 +20,7 @@ var allowedInternalImports = map[string]map[string]bool{
 	"internal/commands":    {"internal/config": true, "internal/doctor": true, "internal/mcp": true, "internal/parity": true, "internal/project": true, "internal/skills": true, "internal/tools": true},
 	"internal/project":     {"internal/config": true},
 	"internal/tui":         {"internal/commands": true, "internal/security": true},
-	"internal/app":         {"internal/agent": true, "internal/commands": true, "internal/config": true, "internal/llm": true, "internal/mcp": true, "internal/project": true, "internal/tui": true},
+	"internal/app":         {"internal/agent": true, "internal/commands": true, "internal/config": true, "internal/llm": true, "internal/mcp": true, "internal/project": true, "internal/tools": true, "internal/tui": true},
 	"internal/archcheck":   {},
 	"internal/config":      {},
 	"internal/covercheck":  {},

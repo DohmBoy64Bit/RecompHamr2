@@ -452,24 +452,165 @@ Stop condition: blocked if live runtime requires undocumented network access,
 unbounded local command execution, fake success paths, package-boundary
 violations, or terminal behavior that cannot be verified locally.
 
-## Next 20 Phase 29: Post-Parity Feature Intake
+## Next 20 Phase 29: Live MCP Agent Integration
 
-Outcome: after Phase 28 and stable publication evidence pass, candidate
-post-parity features are registered with evidence, risk, user value,
+Outcome: connected, enabled, skill-visible MCP tools are exposed to live agent
+turns and dispatched through the MCP manager without bypassing skill gates,
+allowlists, cancellation, or package boundaries.
+Scope: `internal/app` MCP tool schema merging, `internal/app` MCP tool-call
+dispatch through `internal/mcp.Manager`, explicit URL-backed autostart policy,
+MCP user docs, MCP architecture docs, security notes, parity/status/traceability
+rows, and app tests.
+Out of scope: stdio MCP process spawning, persistent user MCP config files,
+external MCP server dependency tests, post-parity features, and stable
+publication.
+Evidence required: live prompt MCP schema exposure tests, MCP tool-call dispatch
+tests, MCP tool error tests, active-skill gating evidence, autostart policy
+tests, docs hash comparison, 100% statement coverage, and `make verify`.
+Verification commands: `go test ./internal/app ./internal/mcp ./internal/commands
+-cover`; `make verify`; `go run ./cmd/recomphamr --summary`.
+Stop condition: blocked if MCP exposure would require an undocumented external
+server, silent tool enablement, fake connection success, package-boundary
+violation, or untested network/tool behavior.
+
+## Corrective MCP And Publication Evidence Hardening
+
+Outcome: stdio MCP process spawning, persistent user MCP config files, and
+stable publication evidence validation are implemented where locally possible
+without claiming external publication.
+Scope: `internal/mcp` stdio connector and config merge behavior,
+`internal/app` persistent MCP config loading and autostart, `internal/release`
+publication evidence validation, MCP user docs, MCP architecture docs,
+release/known-limit docs, parity/status/traceability rows, security notes, and
+coverage tests.
+Out of scope: uploading artifacts, creating remote CI evidence, inventing a
+publication destination, broad post-parity feature intake, or bypassing MCP
+skill gates and allowlists.
+Evidence required: helper-process stdio tests, strict `.rehamr/mcp.json` tests,
+runtime config-loading tests, publication evidence validation tests, git remote
+inspection, docs hash comparison, 100% statement coverage, and `make verify`.
+Verification commands: `go test ./internal/mcp ./internal/app
+./internal/release -cover`; `make verify`; `git remote -v`.
+Stop condition: blocked if external publication evidence requires credentials,
+remote repository configuration, or hosted artifacts that are not available in
+the local checkout.
+
+## Next 20 Phase 30: TUI Reference And Parity Specification
+
+Outcome: the TUI polish work has a non-copying, evidence-backed design and
+parity specification before rendering code changes begin.
+Scope: current TUI audit, RecompHamr 1.x TUI parity requirements,
+user-provided reference screenshots, OpenCode public UI concepts, screen-state
+inventory, visual tokens, responsive breakpoints, command palette behavior,
+footer/status metrics, startup/welcome state, golden render acceptance
+criteria, docs, traceability, and status reports.
+Out of scope: copying OpenCode or RecompHamr 1.x source/design 1:1, changing
+runtime semantics, adding new slash commands, adding desktop UI, or claiming
+unverified token/cost data.
+Evidence required: source/docs references, screenshot-derived observations,
+non-copying design rationale, parity checklist, test plan, docs hash
+comparison, and `make verify`.
+Verification commands: `make verify`; stale wording scan for post-parity phase
+numbers; docs coverage check.
+Stop condition: blocked if a UI requirement cannot be tied to current parity,
+user reference input, local source/docs, or explicitly labeled inspiration.
+
+## Next 20 Phase 31: TUI Visual System And Responsive Layout
+
+Outcome: RecompHamr has a polished terminal visual system with branded startup,
+dark theme, prompt panel, footer/status band, and responsive wide/compact
+layouts while preserving RecompHamr identity.
+Scope: `internal/tui` rendering, theme tokens, startup banner, layout
+composition, MCP/skill/memory indicators, status/footer rendering, wide and
+compact golden outputs, user docs, architecture docs, parity/status/traceability
+rows, and 100% statement coverage.
+Out of scope: changing agent/tool/LLM/MCP semantics, copying OpenCode colors or
+layout exactly, adding fake metrics, or adding desktop UI.
+Evidence required: golden renders for startup, wide chat, compact chat,
+memory-missing state, active skill state, MCP disconnected/connected states,
+responsive narrow behavior, docs hash comparison, and `make verify`.
+Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
+verify`; screenshot or golden render review.
+Stop condition: blocked if visual polish requires untestable terminal behavior,
+hard-coded fake state, package-boundary violations, or copied third-party UI.
+
+## Next 20 Phase 32: TUI Composer, Palette, And Completion UX
+
+Outcome: prompt input, slash command palette, command completion, history,
+paste chips, and keybinding hints are end-user polished and registry-driven.
+Scope: composer editing, multiline prompt behavior, `/` palette opening,
+Tab completion, selected-row styling, argument completion, command
+descriptions, history navigation, large paste chips, cancellation/quit hints,
+docs/help coverage, golden renders, and tests.
+Out of scope: new command semantics, model/tool behavior changes, or hard-coded
+palette entries not generated from the command registry.
+Evidence required: key handling tests, command registry coverage, golden
+palette renders, docs/examples, 100% statement coverage, and `make verify`.
+Verification commands: `go test ./internal/tui ./internal/commands
+./internal/app -cover`; `make verify`.
+Stop condition: blocked if any user-visible keybinding, command entry,
+argument rule, or help text is undocumented or untested.
+
+## Next 20 Phase 33: TUI Transcript, Tool Blocks, And Runtime Feedback
+
+Outcome: conversation, command, tool, MCP, blocked, unsupported, and streaming
+states render as professional end-user transcript blocks without fake data or
+private reasoning history.
+Scope: transcript block rendering, markdown-safe output, PowerShell/tool
+blocks, MCP tool blocks, question/prompt blocks, blocked/unsupported states,
+streaming/thinking status, redacted debug output, context/token/cost rendering
+only when verified, docs, parity/status/traceability rows, and golden tests.
+Out of scope: storing private reasoning, inventing token/cost values, changing
+agent loop policy, or adding unapproved telemetry.
+Evidence required: fake-runtime tests for assistant replies, tool calls, MCP
+results, tool errors, blocked states, cancellation, streaming status, redaction,
+golden renders, docs hash comparison, and `make verify`.
+Verification commands: `go test ./internal/tui ./internal/app ./internal/agent
+-cover`; `make verify`.
+Stop condition: blocked if transcript rendering would need unavailable metrics,
+private reasoning storage, unredacted secrets, or untestable terminal behavior.
+
+## Next 20 Phase 34: Windows Executable And End-User Launch Polish
+
+Outcome: users can build or install a local `recomphamr.exe`, launch the
+polished TUI through it, and verify local checksums without relying on
+published artifacts.
+Scope: Windows build docs, installer walkthrough, local `.exe` smoke evidence,
+release artifact naming docs, checksum verification docs, optional version/about
+output if needed, user quickstart/install docs, release docs, parity/status/
+traceability rows, and verification evidence.
+Out of scope: claiming public downloads, uploading artifacts, creating external
+CI evidence, replacing the running executable, or adding a desktop app.
+Evidence required: local Windows `.exe` build or archive evidence,
+`SHA256SUMS` verification, installer smoke where locally possible, docs hash
+comparison, 100% statement coverage for touched code, and `make verify`.
+Verification commands: `make verify`; `go test ./internal/release
+./internal/update ./internal/app -cover`; local build command for
+`recomphamr_windows_amd64.exe`; checksum verification.
+Stop condition: blocked if `.exe` claims require remote publication,
+credentials, hosted artifacts, or platform behavior that cannot be verified
+locally.
+
+## Next 20 Phase 35: Post-Parity Feature Intake
+
+Outcome: after Phase 28, Phase 29, corrective TUI hardening, local `.exe`
+launch polish, and stable publication evidence pass, candidate post-parity
+features are registered with evidence, risk, user value,
 configuration/docs impact, and explicit approval requirements.
 Scope: decision register, feature intake criteria, docs impact matrix,
 security/risk notes, user-visible examples, and phase goal packets for any
 approved feature candidates.
 Out of scope: implementing new features before approval, reopening parity
 scope, or bypassing live runtime and publication gates.
-Evidence required: current stable publication evidence, Phase 28 closure
+Evidence required: current stable publication evidence, Phase 28 and Phase 29 closure
 evidence, intake register, traceability rows, status report, docs hashes, and
 `make verify`.
 Verification commands: `make verify`; docs coverage check; decision-register
 review.
-Stop condition: blocked if Phase 28 or stable publication evidence is missing.
+Stop condition: blocked if Phase 28, Phase 29, corrective TUI hardening, local
+`.exe` launch polish, or stable publication evidence is missing.
 
-## Next 20 Phase 30: Extension Architecture Planning
+## Next 20 Phase 36: Extension Architecture Planning
 
 Outcome: approved post-parity extension boundaries are designed without
 implementation, with package boundaries, protocol contracts, configuration
@@ -478,7 +619,7 @@ Scope: optional Rust helpers, external analyzers, plugin-style tools, richer
 MCP integrations, future UI surfaces, ADRs, architecture docs, config examples,
 and traceability rows.
 Out of scope: implementation before each extension has an approved goal packet.
-Evidence required: approved Phase 29 intake item, ADR or architecture doc,
+Evidence required: approved Phase 35 intake item, ADR or architecture doc,
 config/help/docs coverage plan, security analysis, and `make verify`.
 Verification commands: `make verify`; docs coverage check; architecture review.
 Stop condition: blocked if an extension lacks approved intake evidence or would

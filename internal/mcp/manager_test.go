@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -266,6 +270,224 @@ func TestHTTPConnectorAndProtocolClient(t *testing.T) {
 	}
 }
 
+func TestStdioAndAutoConnectors(t *testing.T) {
+	orig := execCommandContext
+	defer func() { execCommandContext = orig }()
+	execCommandContext = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		if command != "helper" {
+			return exec.CommandContext(ctx, command, args...)
+		}
+		cmdArgs := append([]string{"-test.run=TestHelperProcessMCP", "--"}, args...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cmdArgs...)
+		cmd.Env = append(os.Environ(), "RECOMPHAMR_MCP_HELPER=1")
+		return cmd
+	}
+	client, err := (StdioConnector{ClientName: "test", ClientVersion: "v"}).Connect(context.Background(), ServerConfig{Name: "stdio", Command: "helper", Args: []string{"ok"}})
+	if err != nil {
+		t.Fatalf("StdioConnector.Connect() error = %v", err)
+	}
+	if tools := client.Tools(); len(tools) != 1 || tools[0].Name != "ping" {
+		t.Fatalf("stdio tools = %+v", tools)
+	}
+	result, err := client.CallTool(context.Background(), "ping", nil)
+	if err != nil || result.Text() != "pong" {
+		t.Fatalf("stdio CallTool() = %+v, %v", result, err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatalf("stdio Close() error = %v", err)
+	}
+	autoClient, err := (AutoConnector{ClientName: "test", ClientVersion: "v"}).Connect(context.Background(), ServerConfig{Name: "stdio", Command: "helper"})
+	if err != nil {
+		t.Fatalf("AutoConnector stdio error = %v", err)
+	}
+	_ = autoClient.Close()
+	if _, err := (StdioConnector{}).Connect(context.Background(), ServerConfig{Name: "empty"}); err == nil || !strings.Contains(err.Error(), "command is empty") {
+		t.Fatalf("StdioConnector empty command error = %v", err)
+	}
+	if _, err := (StdioConnector{}).Connect(context.Background(), ServerConfig{Name: "missing", Command: "definitely-not-a-real-mcp-command"}); err == nil {
+		t.Fatal("StdioConnector accepted missing command")
+	}
+	if _, err := (StdioConnector{}).Connect(context.Background(), ServerConfig{Name: "bad-init", Command: "helper", Args: []string{"bad-init"}}); err == nil || !strings.Contains(err.Error(), "bad init") {
+		t.Fatalf("StdioConnector init error = %v", err)
+	}
+	execCommandContext = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcessMCP")
+		cmd.Stdin = strings.NewReader("busy")
+		return cmd
+	}
+	if _, err := (StdioConnector{}).Connect(context.Background(), ServerConfig{Name: "stdin", Command: "x"}); err == nil || !strings.Contains(err.Error(), "stdin") {
+		t.Fatalf("StdioConnector stdin error = %v", err)
+	}
+	execCommandContext = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+		cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcessMCP")
+		cmd.Stdout = &strings.Builder{}
+		return cmd
+	}
+	if _, err := (StdioConnector{}).Connect(context.Background(), ServerConfig{Name: "stdout", Command: "x"}); err == nil || !strings.Contains(err.Error(), "stdout") {
+		t.Fatalf("StdioConnector stdout error = %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req Request
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("Decode() auto HTTP error = %v", err)
+		}
+		switch req.Method {
+		case MethodInitialize:
+			response, _ := NewResponse(req.ID, InitializeResult{ProtocolVersion: ProtocolVersion, ServerInfo: ServerInfo{Name: "auto", Version: "1"}})
+			_ = json.NewEncoder(w).Encode(response)
+		case MethodInitialized:
+			w.WriteHeader(http.StatusNoContent)
+		case MethodToolsList:
+			response, _ := NewResponse(req.ID, ListToolsResult{Tools: []ToolDef{{Name: "ping"}}})
+			_ = json.NewEncoder(w).Encode(response)
+		}
+	}))
+	defer server.Close()
+	httpClient, err := (AutoConnector{HTTPClient: server.Client()}).Connect(context.Background(), ServerConfig{Name: "http", URL: server.URL, Command: "ignored"})
+	if err != nil {
+		t.Fatalf("AutoConnector HTTP error = %v", err)
+	}
+	_ = httpClient.Close()
+}
+
+func TestMCPConfigLoadAndMerge(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.json")
+	if cfg, err := LoadConfigFile(path); err != nil || len(cfg.Servers) != 0 {
+		t.Fatalf("LoadConfigFile(missing) = %#v, %v", cfg, err)
+	}
+	body := `{"servers":{"ghidra":{"command":"custom-ghidra","args":["--stdio"],"allowed_tools":["decompile"],"autostart":true},"custom":{"url":"http://example.invalid","autostart":true,"require_skill":false}}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	cfg, err := LoadConfigFile(path)
+	if err != nil {
+		t.Fatalf("LoadConfigFile() error = %v", err)
+	}
+	merged := MergeConfigs([]ServerConfig{{Name: "ghidra", Command: "ghidra-mcp", RequireSkill: true}}, cfg)
+	if len(merged) != 2 || merged[0].Command != "custom-ghidra" || len(merged[0].Args) != 1 || !merged[0].Autostart || !merged[0].RequireSkill {
+		t.Fatalf("MergeConfigs override = %#v", merged)
+	}
+	if merged[1].Name != "custom" || merged[1].URL == "" || !merged[1].Autostart || merged[1].RequireSkill {
+		t.Fatalf("MergeConfigs custom = %#v", merged)
+	}
+	falseValue := false
+	cfg = ConfigFile{Servers: map[string]PersistentServerConfig{"x": {Name: "x", Autostart: &falseValue, RequireSkill: &falseValue}}}
+	merged = MergeConfigs([]ServerConfig{{Name: "x", Autostart: true, RequireSkill: true}}, cfg)
+	if merged[0].Autostart || merged[0].RequireSkill {
+		t.Fatalf("MergeConfigs false override = %#v", merged[0])
+	}
+	merged = MergeConfigs([]ServerConfig{{Name: ""}}, ConfigFile{Servers: map[string]PersistentServerConfig{"named": {Name: "named"}}})
+	if len(merged) != 2 || merged[1].Name != "named" {
+		t.Fatalf("MergeConfigs named custom = %#v", merged)
+	}
+	base := mergeServer(ServerConfig{Name: "base", Command: "old", Args: []string{"keep"}, URL: "http://old", AllowedTools: []string{"a"}, Autostart: true, RequireSkill: true}, PersistentServerConfig{})
+	if base.Name != "base" || base.Command != "old" || base.Args[0] != "keep" || base.URL != "http://old" || !base.Autostart || !base.RequireSkill {
+		t.Fatalf("mergeServer empty override = %#v", base)
+	}
+	trueValue := true
+	full := mergeServer(ServerConfig{Name: "base"}, PersistentServerConfig{Name: "renamed", Command: "cmd", Args: []string{"arg"}, URL: "http://new", AllowedTools: []string{"tool"}, Autostart: &trueValue, RequireSkill: &trueValue})
+	if full.Name != "renamed" || full.Command != "cmd" || full.Args[0] != "arg" || full.URL != "http://new" || full.AllowedTools[0] != "tool" || !full.Autostart || !full.RequireSkill {
+		t.Fatalf("mergeServer full override = %#v", full)
+	}
+}
+
+func TestMCPConfigErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "mcp.json")
+	if err := os.WriteFile(path, []byte(`{"servers":{"a":{"name":"b"}}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() mismatch error = %v", err)
+	}
+	if _, err := LoadConfigFile(path); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("LoadConfigFile(mismatch) error = %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"unknown":true}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() unknown error = %v", err)
+	}
+	if _, err := LoadConfigFile(path); err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("LoadConfigFile(unknown) error = %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() empty object error = %v", err)
+	}
+	if cfg, err := LoadConfigFile(path); err != nil || len(cfg.Servers) != 0 {
+		t.Fatalf("LoadConfigFile(empty object) = %#v, %v", cfg, err)
+	}
+	orig := readConfigFile
+	defer func() { readConfigFile = orig }()
+	readConfigFile = func(string) ([]byte, error) { return nil, errors.New("read failed") }
+	if _, err := LoadConfigFile(path); err == nil || !strings.Contains(err.Error(), "read failed") {
+		t.Fatalf("LoadConfigFile(read error) = %v", err)
+	}
+}
+
+func TestStdioProcessStream(t *testing.T) {
+	stream := &stdioProcessStream{
+		stdin:  nopWriteCloser{Builder: &strings.Builder{}},
+		stdout: ioReadCloser{Reader: strings.NewReader("hello")},
+		wait:   func() error { return nil },
+	}
+	buf := make([]byte, 5)
+	if n, err := stream.Read(buf); err != nil || n != 5 || string(buf) != "hello" {
+		t.Fatalf("Read() n=%d err=%v buf=%q", n, err, string(buf))
+	}
+	if n, err := stream.Write([]byte("x")); err != nil || n != 1 {
+		t.Fatalf("Write() n=%d err=%v", n, err)
+	}
+	if err := stream.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if err := stream.Close(); err != nil {
+		t.Fatalf("Close() second error = %v", err)
+	}
+	for name, tc := range map[string]struct {
+		stream *stdioProcessStream
+		want   string
+	}{
+		"stdin":  {&stdioProcessStream{stdin: errWriteCloser{err: errors.New("stdin close")}, stdout: ioReadCloser{Reader: strings.NewReader("")}, wait: func() error { return nil }}, "stdin close"},
+		"stdout": {&stdioProcessStream{stdin: nopWriteCloser{Builder: &strings.Builder{}}, stdout: errReadCloser{err: errors.New("stdout close")}, wait: func() error { return nil }}, "stdout close"},
+		"wait":   {&stdioProcessStream{stdin: nopWriteCloser{Builder: &strings.Builder{}}, stdout: ioReadCloser{Reader: strings.NewReader("")}, wait: func() error { return errors.New("wait failed") }}, "wait failed"},
+	} {
+		if err := tc.stream.Close(); err == nil || !strings.Contains(err.Error(), tc.want) {
+			t.Fatalf("Close(%s) error = %v", name, err)
+		}
+	}
+}
+
+func TestHelperProcessMCP(t *testing.T) {
+	if os.Getenv("RECOMPHAMR_MCP_HELPER") != "1" {
+		return
+	}
+	dec := json.NewDecoder(os.Stdin)
+	enc := json.NewEncoder(os.Stdout)
+	for {
+		var req Request
+		if err := dec.Decode(&req); err != nil {
+			os.Exit(0)
+		}
+		switch req.Method {
+		case MethodInitialize:
+			if len(os.Args) > 0 && os.Args[len(os.Args)-1] == "bad-init" {
+				resp := NewErrorResponse(req.ID, -32000, "bad init")
+				_ = enc.Encode(resp)
+				continue
+			}
+			resp, _ := NewResponse(req.ID, InitializeResult{ProtocolVersion: ProtocolVersion, ServerInfo: ServerInfo{Name: "helper", Version: "1"}})
+			_ = enc.Encode(resp)
+		case MethodInitialized:
+		case MethodToolsList:
+			resp, _ := NewResponse(req.ID, ListToolsResult{Tools: []ToolDef{{Name: "ping", Description: "Ping."}}})
+			_ = enc.Encode(resp)
+		case MethodToolsCall:
+			resp, _ := NewResponse(req.ID, CallToolResult{Content: []ContentItem{{Type: "text", Text: "pong"}}})
+			_ = enc.Encode(resp)
+		default:
+			os.Exit(2)
+		}
+	}
+}
+
 func TestProtocolClientErrors(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -322,6 +544,46 @@ type scriptTransport struct {
 	roundErr   error
 	roundErrAt int
 	notifyErr  error
+}
+
+type nopWriteCloser struct {
+	*strings.Builder
+}
+
+func (w nopWriteCloser) Close() error {
+	return nil
+}
+
+type ioReadCloser struct {
+	*strings.Reader
+}
+
+func (r ioReadCloser) Close() error {
+	return nil
+}
+
+type errWriteCloser struct {
+	err error
+}
+
+func (w errWriteCloser) Write(p []byte) (int, error) {
+	return len(p), nil
+}
+
+func (w errWriteCloser) Close() error {
+	return w.err
+}
+
+type errReadCloser struct {
+	err error
+}
+
+func (r errReadCloser) Read([]byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (r errReadCloser) Close() error {
+	return r.err
 }
 
 func (t *scriptTransport) RoundTrip(context.Context, Request) (Response, error) {

@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"strings"
 	"sync"
 )
+
+var execCommandContext = exec.CommandContext
 
 // Transport exchanges JSON-RPC messages with one MCP server.
 type Transport interface {
@@ -30,9 +33,36 @@ type StdioTransport struct {
 	closed bool
 }
 
+type stdioProcessStream struct {
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	wait   func() error
+	once   sync.Once
+	err    error
+}
+
 // NewStdioTransport creates a stdio transport over stream.
 func NewStdioTransport(name string, stream io.ReadWriteCloser) *StdioTransport {
 	return &StdioTransport{name: name, stream: stream, dec: json.NewDecoder(stream)}
+}
+
+func startStdioProcess(ctx context.Context, command string, args []string) (io.ReadWriteCloser, error) {
+	cmd := execCommandContext(ctx, command, args...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("mcp stdio stdin: %w", err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		_ = stdin.Close()
+		return nil, fmt.Errorf("mcp stdio stdout: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		_ = stdin.Close()
+		_ = stdout.Close()
+		return nil, fmt.Errorf("mcp stdio start %s: %w", command, err)
+	}
+	return &stdioProcessStream{stdin: stdin, stdout: stdout, wait: cmd.Wait}, nil
 }
 
 // RoundTrip sends a line-delimited request and reads a response.
@@ -65,6 +95,34 @@ func (t *StdioTransport) Close() error {
 	defer t.mu.Unlock()
 	t.closed = true
 	return t.stream.Close()
+}
+
+// Read reads bytes from the spawned MCP process stdout stream.
+func (s *stdioProcessStream) Read(p []byte) (int, error) {
+	return s.stdout.Read(p)
+}
+
+// Write writes bytes to the spawned MCP process stdin stream.
+func (s *stdioProcessStream) Write(p []byte) (int, error) {
+	return s.stdin.Write(p)
+}
+
+// Close closes process pipes and waits for the spawned MCP process to exit.
+func (s *stdioProcessStream) Close() error {
+	s.once.Do(func() {
+		inErr := s.stdin.Close()
+		outErr := s.stdout.Close()
+		waitErr := s.wait()
+		switch {
+		case inErr != nil:
+			s.err = inErr
+		case outErr != nil:
+			s.err = outErr
+		default:
+			s.err = waitErr
+		}
+	})
+	return s.err
 }
 
 func (t *StdioTransport) write(ctx context.Context, value interface{}) error {

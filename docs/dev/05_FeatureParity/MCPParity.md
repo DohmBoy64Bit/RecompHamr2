@@ -27,10 +27,20 @@ Required built-ins are `ghidra`, `n64-debug-mcp`, `pcrecomp`, `mcp-pine`, `objdi
 | Full MCP tool calls | implemented | `CallTool` tests for `server.tool`, disabled tools, unknown servers, disconnected servers, and fake client calls. |
 | `/mcp` lifecycle command dispatch | implemented | Command tests for manager-backed connect, disconnect, tools, enable, disable, and blocked failures. |
 
+## Phase 29 Implemented
+
+| Behavior | Status | Evidence |
+|---|---|---|
+| Live agent MCP tool exposure | implemented | `internal/app` tests expose connected, enabled, skill-visible `server.tool` schemas to prompt turns. |
+| Live agent MCP tool dispatch | implemented | `internal/app` tests route `server.tool` calls through `Manager.CallTool` and return text output. |
+| MCP tool failure formatting | implemented | `internal/app` tests convert MCP tool-level errors into tool-failure text. |
+| Explicit autostart | implemented | `internal/app` tests connect only autostart configs and cover persistent config loading; `internal/mcp` tests cover HTTP and stdio connectors. |
+| Stdio process spawning | implemented | `StdioConnector` helper-process tests cover spawn, initialize, tool list, tool call, startup failures, pipe failures, and initialization failures. |
+| Persistent user MCP config | implemented | `LoadConfigFile`, `MergeConfigs`, and app runtime tests cover strict `.rehamr/mcp.json` parsing, unknown-field blockers, built-in overrides, custom servers, and false boolean overrides. |
+
 ## Verified Remaining MCP Limits
 
-Stdio process spawning, app startup autoconnect, persistent user MCP config
-files, and agent-loop MCP tool exposure remain `unsupported`. The supported
-surface is the documented manager lifecycle, streamable HTTP connector,
-skill-gated visibility, full `server.tool` calls, and manager-backed `/mcp`
-command dispatch.
+Real external MCP behavior depends on the user's configured local command or
+HTTP endpoint. Stdio servers execute with the user's local permissions and must
+be configured explicitly in `.rehamr/mcp.json` or built-in metadata. Tool
+visibility remains limited to connected, enabled, skill-visible tools.

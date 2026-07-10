@@ -6,10 +6,12 @@ RecompHamr packages must stay small, directional, and independently testable. Fe
 
 - `cmd/recomphamr` may call only `internal/app`.
 - `internal/app` wires process modes and may compose config, project memory,
-  command environment, MCP manager, and TUI state. It may run deterministic
+  command environment, MCP manager, TUI state, live model clients, and the
+  built-in tool dispatcher required by the agent loop. It may run deterministic
   fake-runtime smoke through injected `internal/agent` and `internal/llm`
-  contracts. It must not own product behavior, execute tools directly,
-  autoconnect MCP servers, or run model turns during startup.
+  contracts. It must not own slash command behavior, TUI render policy, tool
+  implementation internals, MCP protocol behavior, stdio MCP process spawning,
+  or run model turns during startup.
 - `internal/tui` may call `internal/commands` and must not execute tools, mutate config, own the agent loop, or manage MCP lifecycles.
 - `internal/commands` may coordinate config, project, skills, tools, MCP registry, and parity metadata.
 - `internal/doctor` may read config, project memory, skills, tool schemas, and MCP registrations for offline diagnostics; it must not mutate state, probe networks, launch tools, own command parsing, or perform release/update work.

@@ -6,8 +6,15 @@ Bare startup composes local runtime state:
 recomphamr
 ```
 
-It loads config, optional memory, slash commands, MCP manager state, and pure
-TUI state, then prints a launch summary without making model calls.
+It loads config, optional memory, slash commands, MCP manager state, and launches
+the Bubble Tea TUI. Startup itself does not make model calls; prompts submitted
+inside the TUI use the active OpenAI-compatible model profile.
+
+Use a summary-only command when you need deterministic startup evidence:
+
+```sh
+recomphamr --summary
+```
 
 Diagnostic command-line mode is also supported:
 
@@ -15,9 +22,12 @@ Diagnostic command-line mode is also supported:
 recomphamr --diagnostic
 ```
 
-The slash command registry is implemented and wired into the composed runtime
-environment. Deterministic fake-runtime smoke covers slash command dispatch
-through the TUI model. Real backend prompt/model turns remain unsupported.
+The slash command registry is implemented and wired into the live runtime
+environment. Slash commands dispatch in the TUI without calling the model.
+
+In the TUI, typing `/` opens the registry-backed command palette. `Tab`
+completes the first matching command, and palette rows show the command summary
+and usage from `internal/commands.Registry`.
 
 ## Slash Command Reference
 

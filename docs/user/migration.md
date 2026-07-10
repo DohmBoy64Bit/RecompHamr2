@@ -18,8 +18,10 @@ behavior through parity rows and tests, but it does not copy 1.x internals 1:1.
 
 - `powershell` is the primary shell tool because RecompHamr 2.0 is
   Windows-first. `bash` remains as a compatibility alias for 1.x parity.
-- Runtime startup now prints a deterministic local summary. It does not
-  silently call a model, execute tools, or autoconnect MCP servers.
+- Runtime startup now launches the terminal app. It does not call a model or
+  execute tools until a prompt or command requests that behavior.
+- MCP autostart is explicit and can use streamable HTTP URLs or configured
+  stdio commands from `.rehamr/mcp.json`.
 - `/skill-new` fetches and caches skill Markdown for review. It does not
   silently install or activate custom skills.
 - Release helpers verify local files and `SHA256SUMS`; remote release downloads
@@ -40,7 +42,6 @@ behavior through parity rows and tests, but it does not copy 1.x internals 1:1.
 
 ## Verified Limits
 
-Real backend prompt/model turns, real product tool execution, MCP autoconnect,
-stdio MCP process spawning, remote release downloads, installer execution tests
-on every platform, and the live Bubble Tea process remain `unsupported` in this
-checkout.
+Remote release downloads and installer execution tests on every platform remain
+`unsupported` in this checkout. Stdio MCP process spawning and persistent user
+MCP config are implemented but require explicit local configuration.

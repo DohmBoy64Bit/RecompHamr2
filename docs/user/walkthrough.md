@@ -1,9 +1,7 @@
 # Fresh-Clone Walkthrough
 
 This walkthrough covers the verified RecompHamr 2.0 local path in this checkout.
-Live model turns, live tool execution through the product runtime, MCP
-autoconnect, remote release downloads, and the interactive Bubble Tea process
-remain `unsupported`.
+Remote release downloads remain `unsupported`.
 
 ## 1. Verify The Checkout
 
@@ -16,7 +14,7 @@ go run ./cmd/recomphamr --diagnostic
 coverage gate. Diagnostic mode prints foundation status without mutating model,
 tool, or MCP state.
 
-## 2. Compose Local Runtime State
+## 2. Launch The Terminal App
 
 ```powershell
 go run ./cmd/recomphamr
@@ -24,7 +22,21 @@ go run ./cmd/recomphamr
 
 Bare startup creates or loads `.rehamr/config.yaml`, reads optional
 `.rehamr/REPHAMR_STATE.md`, wires slash commands, registers MCP server metadata,
-and prepares pure TUI state. It does not call a backend model.
+and launches the Bubble Tea interface. It does not call a backend model until a
+prompt is submitted.
+
+Use `go run ./cmd/recomphamr --summary` when you need the deterministic runtime
+composition report without opening the TUI.
+
+To run a local Windows executable instead of the development `go run` path:
+
+```powershell
+go build -trimpath -o .\dist\recomphamr.exe .\cmd\recomphamr
+.\dist\recomphamr.exe
+```
+
+Release archives also use `.exe` inside Windows artifacts. Public downloadable
+artifacts remain blocked until external publication evidence exists.
 
 ## 3. Configure A Model Profile
 
@@ -63,17 +75,18 @@ Important generated files include `PROJECT.md`, `REPHAMR_STATE.md`,
 Use `/skill ghidra-mcp` or another documented skill name to activate a skill
 for the current session.
 
-Tool schemas are `powershell`, `read_file`, `write_file`, `edit_file`,
-`repomixr`, and `recomp_reference`. `bash` is retained as a 1.x compatibility
-alias, but Windows-focused workflows should use `powershell`.
+Tool schemas available to model turns are `powershell`, `read_file`,
+`write_file`, `edit_file`, `repomixr`, and `recomp_reference`. `bash` is
+retained as a 1.x compatibility alias, but Windows-focused workflows should use
+`powershell`.
 
 ## 6. Inspect MCP State
 
 Use `/mcp` to list built-in registrations. With manager wiring,
 `/mcp connect <server>`, `/mcp tools <server>`, `/mcp enable <server> <tool>`,
 `/mcp disable <server> <tool>`, and `/mcp disconnect <server>` are supported
-for registered HTTP-capable manager flows. Stdio process spawning and app
-autostart remain `unsupported`.
+for registered manager flows. HTTP and configured stdio servers can autoconnect
+only when explicit autostart metadata is present.
 
 ## 7. Run Doctor And Troubleshoot
 

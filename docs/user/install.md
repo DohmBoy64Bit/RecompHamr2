@@ -11,6 +11,19 @@ go run ./cmd/recomphamr --diagnostic
 
 ## Local Installers
 
+Build a local Windows executable from this checkout:
+
+```powershell
+go build -trimpath -o .\dist\recomphamr.exe .\cmd\recomphamr
+.\dist\recomphamr.exe --summary
+.\dist\recomphamr.exe --diagnostic
+.\dist\recomphamr.exe
+```
+
+`--summary` and `--diagnostic` are non-interactive smoke commands. Running the
+`.exe` without flags launches the Bubble Tea terminal app and does not contact a
+model backend until you submit a prompt.
+
 Windows PowerShell installer:
 
 ```powershell
@@ -114,6 +127,27 @@ archive: dist/recomphamr_windows_amd64.zip
 The archive helper does not build the binary, download releases, install files,
 or update an existing installation.
 
+Manual local Windows archive smoke:
+
+```powershell
+$release = "$env:TEMP\recomphamr-release"
+New-Item -ItemType Directory -Force -Path $release | Out-Null
+go build -trimpath -o "$release\recomphamr.exe" .\cmd\recomphamr
+Compress-Archive -LiteralPath "$release\recomphamr.exe" -DestinationPath "$release\recomphamr_windows_amd64.zip"
+$hash = (Get-FileHash -Algorithm SHA256 "$release\recomphamr_windows_amd64.zip").Hash.ToLowerInvariant()
+Set-Content -Encoding ascii -NoNewline -Path "$release\SHA256SUMS" -Value "$hash  recomphamr_windows_amd64.zip`n"
+```
+
+Verify the manifest before installing:
+
+```powershell
+$line = Get-Content "$release\SHA256SUMS" -Raw
+$parts = $line.Trim() -split '\s+', 2
+$parts[0] -eq (Get-FileHash -Algorithm SHA256 (Join-Path $release $parts[1])).Hash.ToLowerInvariant()
+```
+
+The expected verification result is `True`.
+
 ## Binary Builds
 
 `internal/release.BuildBinary` can run a local `go build` for a supported target.
@@ -137,6 +171,10 @@ Defaults:
 
 Existing binary outputs are not overwritten. This helper builds only from the
 local checkout; it does not package, install, download, or update releases.
+
+Published `.exe` downloads remain `blocked:` until an external release page,
+artifact URL, checksum URL, CI/platform run, and publication timestamp are
+recorded and validated.
 
 ## Release Config, Devcontainer, And CI
 

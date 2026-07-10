@@ -25,18 +25,18 @@ or `blocked:` rather than pretending success.
 | Phase 0 source inventory | passed | Reference commit `259a450e93af48437ee23663e5ca66cdc1ab8569`, `internal/parity`, `RecompHamr1Inventory.md`, `make verify`. |
 | Governance docs | passed | `AGENTS.md`, workflow docs, docscheck, traceability rows. |
 | Diagnostic skeleton | passed | `cmd/recomphamr`, `internal/app`, diagnostic tests, diagnostic CLI output. |
-| Config/workspace and memory | partial | Config, workspace bootstrap, memory loading, agent injection, startup status, and fake-runtime memory smoke are covered. Real backend memory consumption remains unsupported. |
+| Config/workspace and memory | partial | Config, workspace bootstrap, memory loading, agent injection, summary status, fake-runtime memory smoke, live prompt-turn memory injection, and persistent MCP config loading are covered. |
 | LLM/context helpers | passed | `internal/llm`, streaming/provider/context tests, protocol and context docs. |
 | Built-in tools | passed | `internal/tools`, schemas, Windows-first `powershell`, `bash` compatibility alias, tool docs, security tests. |
 | Agent loop | passed | `internal/agent` fake-model tests for tool pairing, nudges, cancellation, and round limits. |
-| TUI shell contract | partial | Pure TUI model and Bubble Tea adapter are covered. Launching the live Bubble Tea process loop remains unsupported. |
+| TUI shell contract | passed | Pure TUI model, Bubble Tea adapter, app-owned live wrapper, launch wiring, cancellation, status, and clean quit are covered. |
 | Slash commands | passed | All 11 parity commands have registry metadata, generated help, docs, examples, side effects, and tests. |
 | Skills | passed | All 28 embedded skills, custom precedence, resolution, active listing, audit, and skill-new fetch/cache workflow are covered. |
 | MCP protocol foundation | passed | JSON-RPC, stdio injected-stream transport, streamable HTTP transport, payloads, and fake transport tests are covered. |
-| MCP manager runtime | partial | Manager lifecycle, streamable HTTP connector, tool gating, and `/mcp` command dispatch are covered. Stdio process spawning, app autoconnect, persistent user MCP config files, and agent-loop MCP exposure remain unsupported. |
+| MCP manager runtime | passed | Manager lifecycle, streamable HTTP connector, stdio process connector, persistent `.rehamr/mcp.json` merge, explicit autostart, tool gating, `/mcp` command dispatch, and live agent-loop MCP exposure are covered. |
 | Doctor diagnostics | passed | Offline diagnostics and operational file validation are covered. |
 | Release verification | partial | Local build/archive/checksum/install-script/dry-run behavior is covered. Remote downloads, remote checksum fetching, automatic binary replacement, and platform installer execution tests remain unsupported. |
-| Product runtime | partial | Bare startup and deterministic fake-runtime smoke are covered. Real backend prompt turns, real tool execution, MCP autoconnect, and Bubble Tea process launch remain unsupported until the corrective Phase 28 live end-user runtime integration closes. |
+| Product runtime | passed | Bare startup launches the Bubble Tea runtime; summary mode preserves deterministic evidence; slash command dispatch, live prompt-to-agent flow, OpenAI-compatible stream adapter behavior, built-in tool dispatch, MCP manager tool dispatch, explicit MCP autostart, cancellation, status, clean quit, fake-runtime smoke, and docs are covered. |
 
 ## Verification
 

@@ -6,19 +6,19 @@ success paths.
 
 ## Runtime Limits
 
-- Real backend prompt/model turns are `unsupported` in product runtime until
-  Phase 28 live end-user runtime integration closes.
-- Real product-runtime tool execution is `unsupported` until Phase 28 wires
-  tool dispatch with cancellation and documented status.
-- MCP autoconnect is `unsupported`.
-- Stdio MCP process spawning is `unsupported`.
-- Persistent user MCP config files beyond current documented metadata are
-  `unsupported`.
-- Interactive Bubble Tea process launch is `unsupported` until Phase 28;
-  current TUI coverage is the pure model and adapter tests.
+- Stdio MCP process spawning is implemented and security-sensitive: configured
+  commands run with the user's local permissions.
+- Persistent user MCP config is limited to the documented `.rehamr/mcp.json`
+  keys: `servers`, `name`, `command`, `args`, `url`, `allowed_tools`,
+  `autostart`, and `require_skill`.
+- MCP autoconnect is limited to configs with explicit `autostart` metadata.
 
 ## Release Limits
 
+- Local Windows `.exe` build and launch are supported from the checkout with
+  `go build -trimpath -o .\dist\recomphamr.exe .\cmd\recomphamr`; local
+  `--summary`, `--diagnostic`, archive, and `SHA256SUMS` verification evidence
+  are recorded in `StableRelease.md`.
 - Published tags and uploaded release artifacts are `unsupported` until the
   stable publication gate is intentionally cut. The local `v2.0.0` tag decision
   is release evidence, not upload evidence.
@@ -28,9 +28,12 @@ success paths.
 - Installer execution tests on every platform are `unsupported`.
 - Dependency audit remains `unsupported`.
 - Stable release publication is `blocked:` until external platform, upload, and
-  publication destination evidence exist. Local artifact, checksum, Windows
-  installer smoke, and stable tag decision evidence are recorded in
-  `StableRelease.md`.
+  publication destination evidence exist. Publication evidence validation is
+  implemented in `internal/release`; Phase 34 `git remote -v` inspection
+  produced no remote output, so no external artifact or checksum URL can be
+  claimed from this checkout. Phase 35 gate audit repeated the blocker:
+  `git remote -v` produced no output and `gh release view v2.0.0` returned
+  `no git remotes found`.
 
 ## Platform Limits
 

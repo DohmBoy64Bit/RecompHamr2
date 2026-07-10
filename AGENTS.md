@@ -44,7 +44,9 @@ Strict separation of concerns is mandatory. Follow `docs/dev/03_Architecture/Sep
 - `make test` runs Go tests.
 - `make docscheck` verifies documentation index and required memory docs.
 - `make archcheck` verifies package dependency boundaries.
-- `go run ./cmd/recomphamr --diagnostic` runs the only supported app mode until parity foundations close.
+- `go run ./cmd/recomphamr` launches the terminal app.
+- `go run ./cmd/recomphamr --summary` prints deterministic runtime composition evidence without launching the TUI.
+- `go run ./cmd/recomphamr --diagnostic` prints foundation status.
 
 ## Coding Style And Documentation
 

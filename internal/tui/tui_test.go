@@ -14,7 +14,7 @@ func TestSubmitAndRender(t *testing.T) {
 	model = model.Submit("hello")
 	model = model.Submit("/help")
 	view := model.Render()
-	if !strings.Contains(view, "RecompHamr initiative") || !strings.Contains(view, "user: hello") || !strings.Contains(view, "/models") {
+	if !strings.Contains(view, "RECOMP HAMR") || !strings.Contains(view, "user: hello") || !strings.Contains(view, "/models") {
 		t.Fatalf("Render() = %q", view)
 	}
 }
@@ -33,7 +33,7 @@ func TestRenderWideLayout(t *testing.T) {
 		MemoryStatus:  "fresh",
 	}
 	view := model.Render()
-	for _, want := range []string{"initiative rail", "transcript", "evidence deck", "memory: fresh", "context: 42k / 131k", "composer >"} {
+	for _, want := range []string{"RECOMP HAMR", "signals", "transcript", "evidence", "memory [fresh]", "context [42k / 131k]", "hints  / commands", "composer >"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("wide render missing %q:\n%s", want, view)
 		}
@@ -44,7 +44,7 @@ func TestRenderCompactLayout(t *testing.T) {
 	model := New(commands.Environment{})
 	model.Transcript = []string{"user: narrow"}
 	view := model.RenderWithLayout(Layout{Width: 80, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "off", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
-	for _, want := range []string{"status: memory=fresh skill=core-re mcp=off", "user: narrow", "composer >"} {
+	for _, want := range []string{"RecompHamr", "status [memory:fresh] [skill:core-re] [mcp:off]", "user: narrow", "composer >"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("compact render missing %q:\n%s", want, view)
 		}
@@ -60,7 +60,7 @@ func TestDefaultLayoutAndImprovements(t *testing.T) {
 		t.Fatalf("DefaultLayout() = %+v", layout)
 	}
 	improvements := Improvements()
-	if len(improvements) != 3 {
+	if len(improvements) != 4 {
 		t.Fatalf("len(Improvements()) = %d, want 3", len(improvements))
 	}
 	for _, improvement := range improvements {
@@ -73,8 +73,72 @@ func TestDefaultLayoutAndImprovements(t *testing.T) {
 func TestRenderWithLayoutDefaultWidth(t *testing.T) {
 	model := New(commands.Environment{})
 	view := model.RenderWithLayout(Layout{})
-	if !strings.Contains(view, "initiative rail") {
+	if !strings.Contains(view, "signals") {
 		t.Fatalf("zero-width layout should default to wide render:\n%s", view)
+	}
+}
+
+func TestRenderStartupAndHelperTokens(t *testing.T) {
+	model := New(commands.Environment{})
+	view := model.Render()
+	for _, want := range []string{"RECOMP HAMR", "RE . decomp . recomp", "safety local commands run", "Ask RecompHamr", "hints  / commands"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("startup render missing %q:\n%s", want, view)
+		}
+	}
+	if got := chip(""); got != "[unverified]" {
+		t.Fatalf("chip(empty) = %q", got)
+	}
+	var b strings.Builder
+	writeHeader(&b, Layout{Mode: "ready", ActiveModel: "local"}, true)
+	if !strings.Contains(b.String(), "RecompHamr") || strings.Contains(b.String(), "RECOMP HAMR") {
+		t.Fatalf("compact header = %q", b.String())
+	}
+	b.Reset()
+	writeDivider(&b, 0)
+	if got := strings.TrimSpace(b.String()); len(got) != 96 {
+		t.Fatalf("default divider length = %d text=%q", len(got), got)
+	}
+	b.Reset()
+	writeDivider(&b, 10)
+	if got := strings.TrimSpace(b.String()); len(got) != 24 {
+		t.Fatalf("small divider length = %d text=%q", len(got), got)
+	}
+	b.Reset()
+	writeDivider(&b, 200)
+	if got := strings.TrimSpace(b.String()); len(got) != 96 {
+		t.Fatalf("large divider length = %d text=%q", len(got), got)
+	}
+}
+
+func TestTranscriptBlocks(t *testing.T) {
+	lines := []string{
+		"user: hi",
+		"assistant: hello",
+		"tool: output",
+		"mcp ghidra connected",
+		"mcp: tool returned error",
+		"blocked: denied",
+		"unsupported: later",
+		"unverified: missing evidence",
+		"status: cancelled",
+		"paste: paste-1 (12 bytes)",
+		"plain note",
+	}
+	wantLabels := []string{"user", "assistant", "tool", "mcp", "mcp", "blocked", "unsupported", "unverified", "status", "attachment", "note"}
+	for i, line := range lines {
+		got := transcriptBlock(line)
+		if !strings.HasPrefix(got, wantLabels[i]) || !strings.Contains(got, line) {
+			t.Fatalf("transcriptBlock(%q) = %q", line, got)
+		}
+	}
+	model := New(commands.Environment{})
+	model.Transcript = lines
+	view := model.RenderWithLayout(Layout{Width: 80, Mode: "ready", ActiveModel: "local", ActiveSkill: "none", MCPStatus: "gated", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
+	for _, want := range []string{"blocked     blocked: denied", "attachment  paste: paste-1", "note        plain note"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("transcript render missing %q:\n%s", want, view)
+		}
 	}
 }
 
@@ -85,6 +149,42 @@ func TestCompleteCommand(t *testing.T) {
 	}
 	if got := CompleteCommand("/zzz"); len(got) != 0 {
 		t.Fatalf("CompleteCommand() = %v, want none", got)
+	}
+}
+
+func TestPaletteRowsAndTabCompletion(t *testing.T) {
+	model := New(commands.Environment{})
+	model.Composer = "/m"
+	rows := model.PaletteRows()
+	if len(rows) == 0 || !strings.Contains(rows[0], "> /models") || !strings.Contains(rows[0], "usage: /models [name]") {
+		t.Fatalf("PaletteRows() = %#v", rows)
+	}
+	view := model.Render()
+	if !strings.Contains(view, "commands\n> /models") {
+		t.Fatalf("palette render = %q", view)
+	}
+	model, action := model.Update(Event{Key: KeyTab})
+	if action != ActionNone || model.Composer != "/models " || !strings.Contains(model.Status, "completed command") {
+		t.Fatalf("tab completion action=%s model=%+v", action, model)
+	}
+	model.Composer = "/unknown"
+	model, _ = model.Update(Event{Key: KeyTab})
+	if !strings.Contains(model.Status, "unverified") {
+		t.Fatalf("tab no-match status=%q", model.Status)
+	}
+	model.Composer = "plain"
+	if rows := model.PaletteRows(); rows != nil {
+		t.Fatalf("PaletteRows(plain) = %#v", rows)
+	}
+	before := model.Composer
+	model, _ = model.Update(Event{Key: KeyTab})
+	if model.Composer != before {
+		t.Fatalf("tab plain changed composer from %q to %q", before, model.Composer)
+	}
+	model.Composer = "/help /models"
+	model, _ = model.Update(Event{Key: KeyTab})
+	if model.Composer != "/help /models" {
+		t.Fatalf("tab with suffix composer=%q", model.Composer)
 	}
 }
 
@@ -316,5 +416,8 @@ func TestBubbleModelAdapter(t *testing.T) {
 	}
 	if key := bubbleKey("home"); key != "home" {
 		t.Fatalf("bubbleKey(home) = %q", key)
+	}
+	if key := bubbleKey("tab"); key != KeyTab {
+		t.Fatalf("bubbleKey(tab) = %q", key)
 	}
 }

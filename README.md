@@ -6,7 +6,8 @@ The rewrite is under a strict feature-parity freeze. New features are blocked un
 
 ## Current Status
 
-The repository is in foundation mode:
+The repository has a usable local terminal runtime while remaining under the
+feature-parity freeze:
 
 - Phase 0 inventory uses `https://github.com/DohmBoy64Bit/RecompHamr` at commit `259a450e93af48437ee23663e5ca66cdc1ab8569`.
 - Phase 1 governance and durable docs memory are present.
@@ -17,11 +18,11 @@ The repository is in foundation mode:
 - Phase 6 agent loop and Phase 7 TUI shell foundations are implemented as independently testable packages.
 - Phase 8 slash command parity is implemented as an independently testable package.
 - Phase 9 skill foundations are implemented as independently testable packages.
-- Product runtime wiring now composes local config, optional memory, slash
-  command environment, MCP manager state, and pure TUI state. Deterministic
-  fake-runtime smoke covers slash commands, prompt/tool turns, cancellation,
-  memory injection, and transcript rendering. Real backend interactive turns
-  remain unsupported.
+- Product runtime wiring launches the Bubble Tea terminal app, dispatches slash
+  commands, sends prompts through the active OpenAI-compatible model profile,
+  routes built-in and connected skill-visible MCP tool calls through the agent
+  loop, supports cancellation, and keeps deterministic fake-runtime smoke
+  coverage.
 
 ## Verify
 
@@ -48,14 +49,12 @@ Help is available with:
 go run ./cmd/recomphamr --help
 ```
 
-This mode reports foundation status only. Bare startup composes local runtime
-state and prints a launch summary:
+This mode reports foundation status only. Bare startup launches the terminal app:
 
 ```sh
 go run ./cmd/recomphamr
 ```
 
-Startup does not call a model backend, autoconnect MCP servers, or execute
-tools. Fake-runtime smoke tests cover prompt flow with injected dependencies;
-real backend model turns and the interactive Bubble Tea process remain
-unsupported.
+Startup does not call a model backend. MCP autostart is explicit and limited to
+URL-backed server configs. Use `go run ./cmd/recomphamr --summary` to print the
+deterministic runtime summary without opening the TUI.

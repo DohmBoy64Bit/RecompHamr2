@@ -36,9 +36,15 @@ Record both names in goal packets, traceability rows, and status reports.
 | 25 | Release Candidate | Workflow Phase 14 | complete for local RC prep |
 | 26 | RC Soak And Bugfix Freeze | Workflow Phase 14 stabilization | complete for local soak |
 | 27 | RecompHamr 2.0 Stable Release | Stable release gate after workflow Phase 14 | partially satisfied; blocked pending publication evidence |
-| 28 | Live End-User Runtime Integration | Corrective runtime integration phase | next; blocks feature intake |
-| 29 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until Phase 28 and stable publication |
-| 30 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until Phase 29 intake |
+| 28 | Live End-User Runtime Integration | Corrective runtime integration phase | complete locally; feature intake still blocked by stable publication evidence |
+| 29 | Live MCP Agent Integration | Corrective MCP runtime integration phase | complete locally; stdio/persistent-config correction complete; feature intake still blocked by stable publication evidence |
+| 30 | TUI Reference And Parity Specification | Corrective TUI hardening | complete |
+| 31 | TUI Visual System And Responsive Layout | Corrective TUI hardening | complete |
+| 32 | TUI Composer, Palette, And Completion UX | Corrective TUI hardening | complete |
+| 33 | TUI Transcript, Tool Blocks, And Runtime Feedback | Corrective TUI hardening | complete |
+| 34 | Windows Executable And End-User Launch Polish | Corrective packaging/runtime hardening | complete locally; public publication still blocked |
+| 35 | Post-Parity Feature Intake | Workflow Phase 15 | blocked until stable publication evidence |
+| 36 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until Phase 35 intake |
 
 ## Global Gates
 
@@ -145,24 +151,138 @@ evidence exists locally.
 ### Phase 28 — Live End-User Runtime Integration
 
 Correct the runtime integration gap by making `recomphamr` launch the usable
-terminal app instead of only printing a startup summary. Wire the Bubble Tea
-program loop, prompt submission, slash command dispatch, real LLM client,
-agent loop, built-in tool dispatcher, cancellation, status updates, debug
-redaction, and graceful quit path into the CLI while preserving strict package
-boundaries. This is parity repair, not new feature intake.
+terminal app instead of only printing a startup summary. The local
+implementation wires the Bubble Tea program loop, prompt submission, slash
+command dispatch, OpenAI-compatible LLM client, agent loop, built-in tool
+dispatcher, cancellation, status updates, and graceful quit path into the CLI
+while preserving strict package boundaries. This is parity repair, not new
+feature intake.
 
-Phase 28 closes only when a user can run the CLI, see the TUI, run slash
+Phase 28 closes locally when a user can run the CLI, see the TUI, run slash
 commands, submit a prompt through the agent loop, cancel work, and exit cleanly
-with tests, docs, help text, security notes, and 100% statement coverage.
+with tests, docs, help text, security notes, and 100% statement coverage. It
+does not unblock feature intake by itself because Phase 27 stable publication
+evidence remains blocked.
 
-### Phase 29 — Post-Parity Feature Intake
+### Phase 29 — Live MCP Agent Integration
 
-Open feature planning after live runtime integration and stable publication.
+Wire connected, enabled, skill-visible MCP tools into live agent turns. The
+local implementation exposes `server.tool` schemas to the model only when the
+matching skill is active and the manager reports the server connected, then
+dispatches MCP tool calls through `internal/mcp.Manager.CallTool`. MCP
+autoconnect remains explicit: only server configs with `Autostart` set are
+connected during runtime composition. HTTP configs use streamable HTTP and stdio
+configs spawn the configured command. Persistent user config is loaded from
+`.rehamr/mcp.json`.
+
+Phase 29 closes locally when live prompt turns can receive MCP tool schemas,
+call MCP tools through the manager, report MCP tool errors as tool failures,
+load persistent MCP config, spawn configured stdio MCP servers, preserve
+cancellation, update docs/security notes, and keep 100% statement coverage. It
+does not unblock feature intake by itself because Phase 27 stable publication
+evidence remains blocked.
+
+### Current Pin
+
+Current implementation is pinned at completed Phase 29 plus the corrective MCP
+and publication-evidence hardening slice. Phase 30 and later are not open for
+general feature intake. The next work is corrective TUI hardening because the
+terminal UI is already an end-user surface and must reach the planned parity and
+polish bar before broader post-parity features.
+
+Reference screenshots and OpenCode research are inspiration only. OpenCode is
+an open-source terminal coding agent and its public docs describe a
+terminal-based interface, build/plan agent switching, package-manager installs,
+and Windows desktop `.exe` distribution. RecompHamr must not copy OpenCode or
+RecompHamr 1.x 1:1. The TUI must keep RecompHamr's evidence-first reverse
+engineering identity, Windows focus, skill/MCP memory visibility, and strict
+separation of concerns.
+
+### Phase 30 — TUI Reference And Parity Specification
+
+Create a TUI design and parity spec before changing rendering code. Compare the
+current RecompHamr TUI, RecompHamr 1.x TUI parity requirements, user-provided
+reference screenshots, and OpenCode public UI concepts. The output is a
+non-copying design contract: screen states, visual hierarchy, color tokens,
+responsive breakpoints, command palette requirements, footer/status metrics,
+startup/welcome state, and screenshot/golden-test acceptance criteria.
+
+Phase 30 is complete. `docs/dev/03_Architecture/TUISpec.md` documents what will
+change, what must stay RecompHamr-specific, which reference observations are
+allowed, and which screenshots/golden renders prove the result.
+
+### Phase 31 — TUI Visual System And Responsive Layout
+
+Implement the RecompHamr visual system: branded startup banner, dark terminal
+theme, restrained orange/gray/cyan or equivalent RecompHamr palette, prompt
+panel, status/footer band, MCP/skill/memory indicators, and responsive
+wide/compact layouts. This phase should lean toward OpenCode's terminal polish
+without copying its exact typography, colors, layout, command names, or source.
+
+Phase 31 is complete for the text-stable visual foundation. `internal/tui`
+renders wide `RECOMP HAMR` branding, compact `RecompHamr` branding, domain and
+safety lines, signals/status chips, evidence column, footer hints, startup idle
+copy, and responsive compact status. ANSI color layering remains for later only
+if it keeps golden renders deterministic.
+
+### Phase 32 — TUI Composer, Palette, And Completion UX
+
+Finish the user input experience: multiline composer, slash command palette,
+argument completion, tab behavior, command descriptions, selected-row styling,
+large paste chips, prompt history, cursor behavior, and keybinding hints.
+Command palette entries must come from RecompHamr's command registry and docs,
+not hard-coded visual mockups.
+
+Phase 32 is complete for registry-backed slash palette and command completion.
+The TUI renders command rows from `internal/commands.Registry`, marks the first
+row selected, shows summaries and usage, completes the first match with Tab,
+retains prompt history/paste behavior, and documents key hints.
+
+### Phase 33 — TUI Transcript, Tool Blocks, And Runtime Feedback
+
+Upgrade transcript rendering for end-user work: user/assistant/tool blocks,
+PowerShell/tool command blocks, MCP tool blocks, questions/prompts, blocked and
+unsupported states, streaming/thinking status, token/context/cost placeholders
+that never fake unavailable data, and redacted debug output. Any metric that is
+not locally known must render as `unverified` or be omitted.
+
+Phase 33 is complete for deterministic transcript classification. The renderer
+labels user, assistant, tool, MCP, blocked, unsupported, unverified, status,
+attachment, and note lines while preserving original text and avoiding fake
+timing, token, cost, or reasoning metrics.
+
+### Phase 34 — Windows Executable And End-User Launch Polish
+
+Close the gap between `go run` development usage and end-user launch. Local
+release code already builds Windows `.exe` artifacts and the Phase 27 local
+stable gate recorded a Windows installer smoke from `recomphamr_windows_amd64.zip`.
+This phase makes the `.exe` path obvious for users: build command docs,
+install-script walkthrough, local smoke instructions, version/about output if
+needed, Start Menu/shortcut guidance if supported, and clear blocked publication
+language until hosted artifacts exist.
+
+Phase 34 is complete locally. A Windows `recomphamr.exe` was built under
+`%TEMP%\recomphamr-phase34`, `--summary` and `--diagnostic` both ran from the
+binary, a local `recomphamr_windows_amd64.zip` archive was created, and the
+local `SHA256SUMS` row verified. Public download claims remain blocked because
+`git remote -v` produced no remote output and no external artifact/checksum/CI
+publication evidence exists.
+
+### Phase 35 — Post-Parity Feature Intake
+
+Open feature planning after live runtime integration, live MCP agent
+integration, corrective TUI hardening, local `.exe` launch polish, and stable
+publication evidence. This phase remains blocked until external publication
+evidence exists. The Phase 35 gate audit found only local evidence: `HEAD`
+`6b17cf2`, local tag `v2.0.0`, 13 local `dist/` entries, and local
+`dist/SHA256SUMS`. `git remote -v` produced no output and
+`gh release view v2.0.0` returned `no git remotes found`, so feature intake did
+not open.
 Create a decision register for candidate enhancements such as safer permission
 prompts, session export/import, richer reverse-engineering dashboards,
 ACP/editor integration, and optional desktop shell.
 
-### Phase 30 — Extension Architecture Planning
+### Phase 36 — Extension Architecture Planning
 
 Design post-parity extension boundaries for optional Rust helpers, external
 analyzers, plugin-style tools, richer MCP integrations, and future UI surfaces.
@@ -193,11 +313,14 @@ No implementation begins until each feature has its own approved goal packet.
 ## Assumptions
 
 - "Next 20 phases" now means the reconciled forward plan from phases 10
-  through 30 after completed Phase 9; Phase 28 was inserted as a corrective
-  runtime integration phase, moving the previous phases 28 and 29 to phases 29
-  and 30.
+  through 36 after completed Phase 9; Phase 28 was inserted as a corrective
+  runtime integration phase, Phase 29 as corrective MCP agent integration,
+  phases 30-34 as corrective TUI and Windows executable hardening, moving
+  feature intake to Phase 35 and extension planning to Phase 36.
 - Go remains the implementation language and `make verify` remains canonical.
 - Windows remains the primary target, with Linux/macOS validated where scripts
   and CI are available.
-- No post-parity feature work begins before Phase 28 live runtime integration
-  and stable publication evidence both pass.
+- No post-parity feature work begins before Phase 28 live runtime integration,
+  Phase 29 live MCP agent integration, corrective TUI hardening, local Windows
+  executable launch polish, and stable publication evidence all pass. Phase 34
+  satisfies only the local Windows executable launch polish gate.

@@ -14,9 +14,9 @@ Included:
 - OpenAI-compatible LLM streaming and context packing helpers.
 - Built-in tool schemas with `powershell` as the primary Windows-first shell
   tool and `bash` as the compatibility alias.
-- Agent loop, pure TUI model, slash command registry, embedded/custom skills,
-  MCP protocol/manager foundations, doctor diagnostics, and local release
-  helpers.
+- Agent loop, live TUI runtime, slash command registry, embedded/custom skills,
+  MCP protocol/manager foundations, live MCP agent integration, doctor
+  diagnostics, and local release helpers.
 - Fresh-clone walkthrough and RecompHamr 1.x migration notes.
 
 Excluded:
@@ -24,10 +24,8 @@ Excluded:
 - Published tags, uploaded artifacts, and remote release downloads.
 - Automatic binary replacement.
 - Installer execution claims on every platform.
-- Live backend prompt/model turns.
-- Product-runtime tool execution.
-- MCP autoconnect and stdio MCP process spawning.
-- Interactive Bubble Tea process launch.
+- Stdio MCP process spawning.
+- Persistent user MCP config files.
 
 ## RC Verification Commands
 

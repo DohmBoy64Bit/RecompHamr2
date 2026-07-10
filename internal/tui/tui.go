@@ -23,6 +23,13 @@ const (
 )
 
 const (
+	brandWide    = "RECOMP HAMR"
+	brandCompact = "RecompHamr"
+	domainLine   = "RE . decomp . recomp . evidence-backed reconstruction"
+	safetyLine   = "local commands run with your user permissions; prompts start work only after submit"
+)
+
+const (
 	// KeyEnter submits the current composer text.
 	KeyEnter = "enter"
 	// KeyBackspace deletes the last composer rune.
@@ -31,6 +38,8 @@ const (
 	KeyUp = "up"
 	// KeyDown recalls the next prompt history entry.
 	KeyDown = "down"
+	// KeyTab completes the current slash command candidate.
+	KeyTab = "tab"
 	// KeyCtrlC cancels active work or arms quit when idle.
 	KeyCtrlC = "ctrl+c"
 	// KeyCtrlD quits immediately.
@@ -244,6 +253,25 @@ func (m Model) Palette() []string {
 	return CompleteCommand(strings.Fields(text + " ")[0])
 }
 
+// PaletteRows returns registry-backed command palette rows for rendering.
+func (m Model) PaletteRows() []string {
+	token := strings.TrimSpace(m.Composer)
+	if !strings.HasPrefix(token, "/") {
+		return nil
+	}
+	fields := strings.Fields(token + " ")
+	prefix := fields[0]
+	var rows []string
+	for i, cmd := range commandMatches(prefix) {
+		pointer := " "
+		if i == 0 {
+			pointer = ">"
+		}
+		rows = append(rows, fmt.Sprintf("%s %-14s %s  usage: %s", pointer, cmd.Name, cmd.Summary, cmd.Usage))
+	}
+	return rows
+}
+
 // Debug records a redacted debug line when debug mode is enabled.
 func (m Model) Debug(text string) Model {
 	if !m.DebugEnabled {
@@ -274,11 +302,10 @@ func (m Model) RenderWithLayout(layout Layout) string {
 
 // CompleteCommand returns matching slash command names.
 func CompleteCommand(prefix string) []string {
+	matches := commandMatches(prefix)
 	var out []string
-	for _, cmd := range commands.Registry() {
-		if strings.HasPrefix(cmd.Name, prefix) {
-			out = append(out, cmd.Name)
-		}
+	for _, cmd := range matches {
+		out = append(out, cmd.Name)
 	}
 	return out
 }
@@ -289,18 +316,24 @@ func Improvements() []string {
 		"evidence rail keeps memory, skill, MCP, and tool state visible for reverse-engineering work",
 		"right-side evidence deck separates verified context from chat transcript to reduce claim drift",
 		"compact mode collapses panels into status bands so narrow terminals remain usable",
+		"RecompHamr-owned visual tokens keep the UI distinct from OpenCode while preserving terminal polish",
 	}
 }
 
 func (m Model) renderWide(layout Layout) string {
 	var b strings.Builder
-	writeHeader(&b, layout)
-	fmt.Fprintf(&b, "initiative rail                 transcript                                  evidence deck\n")
-	fmt.Fprintf(&b, "memory: %-20s %s\n", layout.MemoryStatus, transcriptLine(m.Transcript, 0))
-	fmt.Fprintf(&b, "skill:  %-20s %s\n", layout.ActiveSkill, transcriptLine(m.Transcript, 1))
-	fmt.Fprintf(&b, "mcp:    %-20s %s\n", layout.MCPStatus, transcriptLine(m.Transcript, 2))
-	fmt.Fprintf(&b, "tool:   %-20s %s\n", layout.PendingTool, transcriptLine(m.Transcript, 3))
-	fmt.Fprintf(&b, "                                context: %s\n", layout.ContextStatus)
+	writeHeader(&b, layout, false)
+	writeDivider(&b, layout.Width)
+	fmt.Fprintf(&b, "signals                         transcript                                  evidence\n")
+	fmt.Fprintf(&b, "memory %-22s %s\n", chip(layout.MemoryStatus), transcriptLine(m.Transcript, 0))
+	fmt.Fprintf(&b, "skill  %-22s %s\n", chip(layout.ActiveSkill), transcriptLine(m.Transcript, 1))
+	fmt.Fprintf(&b, "mcp    %-22s %s\n", chip(layout.MCPStatus), transcriptLine(m.Transcript, 2))
+	fmt.Fprintf(&b, "tool   %-22s %s\n", chip(layout.PendingTool), transcriptLine(m.Transcript, 3))
+	fmt.Fprintf(&b, "context %-21s %s\n", chip(layout.ContextStatus), transcriptLine(m.Transcript, 4))
+	if len(m.Transcript) == 0 {
+		fmt.Fprintf(&b, "ready  %-22s %s\n", chip("verified idle"), "Ask RecompHamr, run /help, or activate a skill.")
+	}
+	writePalette(&b, m)
 	writeFooter(&b, m)
 	writeComposer(&b, m)
 	return strings.TrimRight(b.String(), "\n")
@@ -308,25 +341,80 @@ func (m Model) renderWide(layout Layout) string {
 
 func (m Model) renderCompact(layout Layout) string {
 	var b strings.Builder
-	writeHeader(&b, layout)
-	fmt.Fprintf(&b, "status: memory=%s skill=%s mcp=%s tool=%s context=%s\n", layout.MemoryStatus, layout.ActiveSkill, layout.MCPStatus, layout.PendingTool, layout.ContextStatus)
+	writeHeader(&b, layout, true)
+	fmt.Fprintf(&b, "status %s %s %s %s %s\n", chip("memory:"+layout.MemoryStatus), chip("skill:"+layout.ActiveSkill), chip("mcp:"+layout.MCPStatus), chip("tool:"+layout.PendingTool), chip("context:"+layout.ContextStatus))
+	writeDivider(&b, layout.Width)
 	for _, line := range m.Transcript {
-		fmt.Fprintf(&b, "%s\n", line)
+		fmt.Fprintf(&b, "%s\n", transcriptBlock(line))
 	}
+	writePalette(&b, m)
 	writeFooter(&b, m)
 	writeComposer(&b, m)
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func writeHeader(b *strings.Builder, layout Layout) {
-	fmt.Fprintf(b, "RecompHamr initiative // mode=%s // model=%s\n", layout.Mode, layout.ActiveModel)
+func writeHeader(b *strings.Builder, layout Layout, compact bool) {
+	brand := brandWide
+	if compact {
+		brand = brandCompact
+	}
+	fmt.Fprintf(b, "%s\n", brand)
+	fmt.Fprintf(b, "%s\n", domainLine)
+	fmt.Fprintf(b, "mode %s  model %s\n", chip(layout.Mode), chip(layout.ActiveModel))
+	fmt.Fprintf(b, "safety %s\n", safetyLine)
+}
+
+func writeDivider(b *strings.Builder, width int) {
+	if width <= 0 {
+		width = DefaultWidth
+	}
+	if width > 96 {
+		width = 96
+	}
+	if width < 24 {
+		width = 24
+	}
+	fmt.Fprintf(b, "%s\n", strings.Repeat("-", width))
+}
+
+func chip(text string) string {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		text = "unverified"
+	}
+	return "[" + text + "]"
 }
 
 func transcriptLine(lines []string, index int) string {
 	if index >= len(lines) {
 		return ""
 	}
-	return lines[index]
+	return transcriptBlock(lines[index])
+}
+
+func transcriptBlock(line string) string {
+	label := "note"
+	switch {
+	case strings.HasPrefix(line, "user:"):
+		label = "user"
+	case strings.HasPrefix(line, "assistant:"):
+		label = "assistant"
+	case strings.HasPrefix(line, "tool:"):
+		label = "tool"
+	case strings.HasPrefix(line, "mcp ") || strings.HasPrefix(line, "mcp:"):
+		label = "mcp"
+	case strings.HasPrefix(line, "blocked:"):
+		label = "blocked"
+	case strings.HasPrefix(line, "unsupported:"):
+		label = "unsupported"
+	case strings.HasPrefix(line, "unverified:"):
+		label = "unverified"
+	case strings.HasPrefix(line, "status:"):
+		label = "status"
+	case strings.HasPrefix(line, "paste:"):
+		label = "attachment"
+	}
+	return fmt.Sprintf("%-11s %s", label, line)
 }
 
 func (m Model) handleKey(key string) (Model, Action) {
@@ -347,6 +435,9 @@ func (m Model) handleKey(key string) (Model, Action) {
 	case KeyDown:
 		m = m.recall(1)
 		return m, ActionNone
+	case KeyTab:
+		m = m.completeComposer()
+		return m, ActionNone
 	case KeyCtrlC:
 		return m.ctrlC()
 	case KeyCtrlD:
@@ -360,6 +451,33 @@ func (m Model) handleKey(key string) (Model, Action) {
 		m.Status = "unsupported key: " + key
 		return m, ActionNone
 	}
+}
+
+func (m Model) completeComposer() Model {
+	text := strings.TrimSpace(m.Composer)
+	if !strings.HasPrefix(text, "/") {
+		return m
+	}
+	fields := strings.Fields(text)
+	prefix := text
+	suffix := ""
+	if len(fields) > 0 {
+		prefix = fields[0]
+		if len(fields) > 1 {
+			suffix = " " + strings.Join(fields[1:], " ")
+		}
+	}
+	matches := CompleteCommand(prefix)
+	if len(matches) == 0 {
+		m.Status = "unverified: no command matches " + prefix
+		return m
+	}
+	m.Composer = matches[0] + suffix
+	if suffix == "" {
+		m.Composer += " "
+	}
+	m.Status = "completed command: " + matches[0]
+	return m
 }
 
 func (m Model) ctrlC() (Model, Action) {
@@ -406,6 +524,18 @@ func writeFooter(b *strings.Builder, m Model) {
 	}
 	if m.DebugEnabled && len(m.DebugLog) > 0 {
 		fmt.Fprintf(b, "debug > %s\n", m.DebugLog[len(m.DebugLog)-1])
+	}
+	fmt.Fprintf(b, "hints  / commands  Tab complete  Ctrl+C cancel/quit  Ctrl+D exit\n")
+}
+
+func writePalette(b *strings.Builder, m Model) {
+	rows := m.PaletteRows()
+	if len(rows) == 0 {
+		return
+	}
+	fmt.Fprintf(b, "commands\n")
+	for _, row := range rows {
+		fmt.Fprintf(b, "%s\n", row)
 	}
 }
 
@@ -481,10 +611,22 @@ func bubbleEvent(msg tea.Msg) (Event, bool) {
 }
 
 func bubbleKey(key string) string {
-	switch key {
+	switch strings.ToLower(key) {
 	case KeyEnter, KeyBackspace, KeyUp, KeyDown, KeyCtrlC, KeyCtrlD, KeyEsc:
 		return key
+	case KeyTab:
+		return KeyTab
 	default:
 		return key
 	}
+}
+
+func commandMatches(prefix string) []commands.Command {
+	var out []commands.Command
+	for _, cmd := range commands.Registry() {
+		if strings.HasPrefix(cmd.Name, prefix) {
+			out = append(out, cmd)
+		}
+	}
+	return out
 }

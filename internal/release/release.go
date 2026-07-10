@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 var (
@@ -133,6 +134,40 @@ type OperationalResult struct {
 	Detail string
 }
 
+// PublicationEvidence describes externally hosted stable-release proof.
+type PublicationEvidence struct {
+	// Version is the stable release version or tag name.
+	Version string
+	// Commit is the source commit associated with the release.
+	Commit string
+	// CIURL is the external CI run URL that built or verified the release.
+	CIURL string
+	// ArtifactURL is the external release artifact URL.
+	ArtifactURL string
+	// ChecksumURL is the external checksum manifest URL.
+	ChecksumURL string
+	// PublishedAt is the external publication timestamp when known.
+	PublishedAt time.Time
+}
+
+// PublicationResult describes validation for one publication evidence field.
+type PublicationResult struct {
+	// Field is the evidence field that was validated.
+	Field string
+	// Status is the validation outcome.
+	Status Status
+	// Detail explains the verified value or missing evidence.
+	Detail string
+}
+
+// PublicationReport describes whether stable publication evidence is complete.
+type PublicationReport struct {
+	// Evidence is the publication evidence that was checked.
+	Evidence PublicationEvidence
+	// Results is the ordered validation result list.
+	Results []PublicationResult
+}
+
 // DefaultTargets returns the supported release artifact targets.
 func DefaultTargets() []Target {
 	return []Target{
@@ -164,6 +199,19 @@ func ValidateOperationalFiles(repoRoot string) []OperationalResult {
 		results = append(results, validateOperationalFile(repoRoot, file))
 	}
 	return results
+}
+
+// ValidatePublicationEvidence checks stable-release proof without claiming an upload.
+func ValidatePublicationEvidence(evidence PublicationEvidence) PublicationReport {
+	results := []PublicationResult{
+		validateRequiredField("version", evidence.Version),
+		validateRequiredField("commit", evidence.Commit),
+		validateExternalURL("ci_url", evidence.CIURL),
+		validateExternalURL("artifact_url", evidence.ArtifactURL),
+		validateExternalURL("checksum_url", evidence.ChecksumURL),
+		validatePublishedAt(evidence.PublishedAt),
+	}
+	return PublicationReport{Evidence: evidence, Results: results}
 }
 
 // ArtifactName returns the canonical archive name for target.
@@ -371,6 +419,11 @@ func (r Report) Verified() bool {
 	return len(r.Results) > 0 && r.Count(StatusBlocked) == 0
 }
 
+// Verified reports whether every publication evidence field is externally verified.
+func (r PublicationReport) Verified() bool {
+	return len(r.Results) > 0 && r.Count(StatusBlocked) == 0
+}
+
 func normalizeTarget(target Target) Target {
 	return Target{
 		OS:      strings.ToLower(strings.TrimSpace(target.OS)),
@@ -440,6 +493,56 @@ func validateOperationalFile(repoRoot string, file OperationalFile) OperationalR
 		}
 	}
 	return OperationalResult{File: file, Status: StatusVerified, Detail: file.Purpose}
+}
+
+func validateRequiredField(field string, value string) PublicationResult {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return PublicationResult{Field: field, Status: StatusBlocked, Detail: "missing required publication evidence"}
+	}
+	return PublicationResult{Field: field, Status: StatusVerified, Detail: value}
+}
+
+func validateExternalURL(field string, value string) PublicationResult {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return PublicationResult{Field: field, Status: StatusBlocked, Detail: "missing external publication URL"}
+	}
+	if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") {
+		return PublicationResult{Field: field, Status: StatusBlocked, Detail: "publication evidence must be an external HTTP(S) URL"}
+	}
+	if strings.Contains(value, "localhost") || strings.Contains(value, "127.0.0.1") || strings.Contains(value, "::1") {
+		return PublicationResult{Field: field, Status: StatusBlocked, Detail: "publication evidence must not point at a local host"}
+	}
+	return PublicationResult{Field: field, Status: StatusVerified, Detail: value}
+}
+
+func validatePublishedAt(value time.Time) PublicationResult {
+	if value.IsZero() {
+		return PublicationResult{Field: "published_at", Status: StatusBlocked, Detail: "missing external publication timestamp"}
+	}
+	return PublicationResult{Field: "published_at", Status: StatusVerified, Detail: value.UTC().Format(time.RFC3339)}
+}
+
+// Count returns the number of publication results with status.
+func (r PublicationReport) Count(status Status) int {
+	total := 0
+	for _, result := range r.Results {
+		if result.Status == status {
+			total++
+		}
+	}
+	return total
+}
+
+// String renders a user-facing publication evidence report.
+func (r PublicationReport) String() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "publication evidence: %s\n", strings.TrimSpace(r.Evidence.Version))
+	for _, result := range r.Results {
+		fmt.Fprintf(&b, "[%s] %s: %s\n", result.Status, result.Field, result.Detail)
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // Count returns the number of results with status.

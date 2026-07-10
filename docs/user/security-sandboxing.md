@@ -21,11 +21,15 @@ Phase 5 shell and file tool controls:
 - `repomixr` accepts only `github.com/owner/repo` URLs and keeps clone targets inside the configured cache directory.
 - `recomp_reference` accepts only `http` or `https` URLs and keeps sanitized cache files inside the configured cache directory.
 
-Current unsupported security-sensitive behavior:
+Current security-sensitive runtime behavior:
 
-- Real backend prompt/model turns.
-- Real tool execution from product startup.
-- MCP autoconnect, stdio process spawning, persistent user MCP config files,
-  and agent-loop MCP exposure.
+- Startup does not call a model or execute tools until a user submits a prompt
+  or command.
+- MCP tool exposure in the agent loop is limited to connected, enabled tools
+  unlocked by active skills.
+- MCP autostart is limited to server configs with explicit autostart metadata.
+- Stdio MCP process spawning is supported only through configured server
+  commands and runs with the user's local permissions.
+- Persistent `.rehamr/mcp.json` config uses strict JSON and blocks unknown keys.
 - Remote release downloads, remote checksum fetching, automatic binary
   replacement, and platform installer execution tests.

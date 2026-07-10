@@ -5,11 +5,14 @@ creation, strict loading, model profile selection, and process-local URL
 overrides.
 
 Create the workspace and config through the command registry with `/init-re`, or
-run bare startup to bootstrap config and print a local runtime summary:
+run bare startup to bootstrap config and launch the terminal app:
 
 ```sh
 go run ./cmd/recomphamr
 ```
+
+Use `go run ./cmd/recomphamr --summary` to print the local runtime summary
+without launching the TUI.
 
 You can also verify the config package directly:
 

@@ -386,6 +386,24 @@ type HTTPConnector struct {
 	ClientVersion string
 }
 
+// StdioConnector creates MCP clients by spawning stdio MCP server processes.
+type StdioConnector struct {
+	// ClientName is reported during initialize.
+	ClientName string
+	// ClientVersion is reported during initialize.
+	ClientVersion string
+}
+
+// AutoConnector chooses HTTP or stdio MCP connection based on server config.
+type AutoConnector struct {
+	// HTTPClient sends HTTP requests for URL-backed configs.
+	HTTPClient *http.Client
+	// ClientName is reported during initialize.
+	ClientName string
+	// ClientVersion is reported during initialize.
+	ClientVersion string
+}
+
 // Connect initializes an HTTP MCP client.
 func (c HTTPConnector) Connect(ctx context.Context, config ServerConfig) (Client, error) {
 	if config.URL == "" {
@@ -404,6 +422,40 @@ func (c HTTPConnector) Connect(ctx context.Context, config ServerConfig) (Client
 		return nil, err
 	}
 	return session, nil
+}
+
+// Connect starts a stdio MCP process and initializes a protocol client.
+func (c StdioConnector) Connect(ctx context.Context, config ServerConfig) (Client, error) {
+	command := strings.TrimSpace(config.Command)
+	if command == "" {
+		return nil, fmt.Errorf("mcp: command is empty for %s", config.Name)
+	}
+	clientName := c.ClientName
+	if clientName == "" {
+		clientName = "recomphamr"
+	}
+	clientVersion := c.ClientVersion
+	if clientVersion == "" {
+		clientVersion = "2.0"
+	}
+	stream, err := startStdioProcess(ctx, command, config.Args)
+	if err != nil {
+		return nil, err
+	}
+	session := NewProtocolClient(config.Name, clientName, clientVersion, NewStdioTransport(config.Name, stream))
+	if err := session.Initialize(ctx); err != nil {
+		_ = session.Close()
+		return nil, err
+	}
+	return session, nil
+}
+
+// Connect chooses streamable HTTP when URL is present, otherwise stdio command spawning.
+func (c AutoConnector) Connect(ctx context.Context, config ServerConfig) (Client, error) {
+	if strings.TrimSpace(config.URL) != "" {
+		return HTTPConnector{HTTPClient: c.HTTPClient, ClientName: c.ClientName, ClientVersion: c.ClientVersion}.Connect(ctx, config)
+	}
+	return StdioConnector{ClientName: c.ClientName, ClientVersion: c.ClientVersion}.Connect(ctx, config)
 }
 
 // ProtocolClient is an MCP client backed by a Transport.

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseManifest(t *testing.T) {
@@ -130,6 +131,48 @@ func TestValidateOperationalFilesBlocked(t *testing.T) {
 	unsafe := OperationalFile{Path: "../bad", Purpose: "bad", Markers: []string{"x"}}
 	if got := validateOperationalFile(dir, unsafe); got.Status != StatusBlocked || !strings.Contains(got.Detail, "relative") {
 		t.Fatalf("validateOperationalFile(unsafe) = %#v", got)
+	}
+}
+
+func TestValidatePublicationEvidence(t *testing.T) {
+	report := ValidatePublicationEvidence(PublicationEvidence{
+		Version:     "v2.0.0",
+		Commit:      "abc123",
+		CIURL:       "https://github.com/example/repo/actions/runs/1",
+		ArtifactURL: "https://github.com/example/repo/releases/download/v2.0.0/recomphamr_windows_amd64.zip",
+		ChecksumURL: "https://github.com/example/repo/releases/download/v2.0.0/SHA256SUMS",
+		PublishedAt: time.Date(2026, 7, 10, 1, 2, 3, 0, time.FixedZone("EDT", -4*60*60)),
+	})
+	if !report.Verified() || report.Count(StatusVerified) != 6 || report.Count(StatusBlocked) != 0 {
+		t.Fatalf("ValidatePublicationEvidence() = %#v", report)
+	}
+	out := report.String()
+	for _, want := range []string{"publication evidence: v2.0.0", "[verified] ci_url", "2026-07-10T05:02:03Z"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("publication report missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestValidatePublicationEvidenceBlocked(t *testing.T) {
+	report := ValidatePublicationEvidence(PublicationEvidence{
+		CIURL:       "file:///tmp/run",
+		ArtifactURL: "http://localhost/artifact.zip",
+	})
+	if report.Verified() || report.Count(StatusBlocked) != 6 {
+		t.Fatalf("blocked publication report = %#v", report)
+	}
+	out := report.String()
+	for _, want := range []string{"missing required publication evidence", "external HTTP(S) URL", "must not point at a local host", "missing external publication timestamp"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("blocked publication report missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestPublicationReportEmptyNotVerified(t *testing.T) {
+	if (PublicationReport{}).Verified() {
+		t.Fatal("empty PublicationReport verified")
 	}
 }
 

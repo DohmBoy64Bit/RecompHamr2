@@ -13,16 +13,38 @@ Next 20 Phase 14 app wiring contract:
   memory, create the command environment, create the MCP manager without
   autoconnect, and create pure TUI state.
 - `internal/app` must not own slash command behavior, TUI update/render policy,
-  model-tool loop policy, tool execution, config schema rules, MCP protocol
-  behavior, or project workspace persistence.
-- Bare `recomphamr` startup may report a deterministic local launch summary but
-  must not probe networks, call a model backend, autoconnect MCP servers, or
-  pretend an agent turn completed.
+  model-tool loop policy, concrete tool internals, config schema rules, MCP
+  protocol behavior, or project workspace persistence.
+- Bare `recomphamr` startup launches the Bubble Tea app and must not probe
+  model backends, call a model backend, or pretend an agent turn completed
+  before the user submits a prompt. MCP autostart is allowed only when explicit
+  autostart metadata is present.
+- `internal/app.Launch` owns the live runtime bridge from TUI submit/cancel/quit
+  intent to the existing agent loop, OpenAI-compatible streaming client, and
+  built-in tool dispatcher. This bridge is app wiring; the TUI remains pure and
+  `internal/agent` remains unaware of concrete tools.
+- `--summary` reports deterministic local launch evidence without opening the
+  terminal app.
 - `internal/app.RunSmoke` may execute deterministic fake-runtime smoke with
   caller-injected model and tool runner dependencies. It may coordinate the
   existing agent loop and pure TUI renderer for tests, but it must not call real
-  model backends, execute real tools, autoconnect MCP servers, or launch a
+  model backends, execute real tools, autoconnect stdio MCP servers, or launch a
   terminal process.
+
+Phase 28 live runtime contract:
+
+- Prompt submission inside the TUI creates one cancellable agent turn with the
+  active model profile from `.rehamr/config.yaml`.
+- Slash commands continue to execute through `internal/commands` without model
+  calls.
+- Built-in tool calls route through `internal/tools` using `powershell`,
+  `read_file`, `write_file`, `edit_file`, `repomixr`, `recomp_reference`, and
+  the `bash` compatibility alias.
+- Ctrl+C during a running turn cancels the agent context; Ctrl+D or double
+  Ctrl+C exits cleanly through Bubble Tea.
+- MCP agent-loop exposure is supported only through connected, enabled,
+  skill-visible manager tools. Autostart is explicit and may use HTTP or
+  configured stdio commands.
 
 Phase 3 config and workspace contracts:
 
@@ -91,11 +113,10 @@ Phase 10 MCP protocol contract:
   types, MCP initialize/tools payloads, injected stdio transport, and streamable
   HTTP request/response transport.
 - `internal/mcp` protocol transports must be testable without real external MCP
-  servers. Stdio process spawning, persistent manager lifecycle, and agent tool
-  exposure are separate runtime responsibilities.
-- User-visible MCP lifecycle commands must continue to report explicit
-  `unsupported`, `unverified`, or `blocked` output until manager behavior is
-  implemented and tested.
+  servers. Manager lifecycle and agent tool exposure remain separate runtime
+  responsibilities.
+- User-visible MCP lifecycle commands must report explicit `blocked` output when
+  manager actions fail.
 
 Plan Phase 11 MCP manager contract:
 
@@ -105,8 +126,20 @@ Plan Phase 11 MCP manager contract:
 - `internal/commands` may call a provided `*mcp.Manager` from command
   environment for `/mcp` lifecycle commands. It must return `unsupported:` when
   manager wiring is absent and `blocked:` when manager actions fail.
-- Stdio process spawning, app autostart, persistent user MCP config files, and
-  agent-loop MCP exposure remain outside this contract.
+- Stdio process spawning and persistent user MCP config files are implemented in
+  `internal/mcp`. App autostart is limited to configs with explicit autostart
+  metadata. Agent-loop MCP exposure is owned by the Phase 29 app wiring contract
+  and must use manager skill gates and allowlists.
+
+Phase 29 MCP agent integration contract:
+
+- `internal/app` may ask `internal/mcp.Manager` for `ToolsForSkills` when a live
+  prompt starts and convert those tool definitions into LLM function schemas.
+- `internal/app` may dispatch `server.tool` calls to `Manager.CallTool` as part
+  of the app-owned tool runner.
+- `internal/app` must not bypass MCP skill gates, enabled-tool allowlists,
+  connection state, or MCP protocol ownership.
+- MCP tool-level errors must be visible to the agent loop as tool failures.
 
 Phase 12 doctor contract:
 

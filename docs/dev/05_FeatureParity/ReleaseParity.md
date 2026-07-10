@@ -50,10 +50,16 @@ Implemented Phase 12 checksum slice:
   files and required markers locally.
 - `internal/update.PlanLocal` verifies a local artifact against `SHA256SUMS`
   and returns a self-update dry-run plan without replacing the executable.
+- Phase 34 local Windows executable evidence built
+  `%TEMP%\recomphamr-phase34\recomphamr.exe` with `go build -trimpath`, ran
+  `--summary` and `--diagnostic`, archived it as
+  `recomphamr_windows_amd64.zip`, and verified the local `SHA256SUMS` row.
 
 Phase 25 RC preparation adds local release-candidate notes and a known-limits
 ledger. Still `unsupported`: release downloads, remote checksum fetching,
 automatic replacement of the running executable, published artifact upload, and
-platform installer execution tests.
+platform installer execution tests. Stable publication remains `blocked:` when
+no git remote, hosted artifact URL, hosted checksum URL, external CI evidence,
+or publication timestamp exists.
 
 Verification evidence: `go test ./internal/release -cover` and `make verify`.
