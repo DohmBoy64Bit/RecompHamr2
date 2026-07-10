@@ -17,16 +17,17 @@ success paths.
 
 ## Release Limits
 
-- Published tags and uploaded release artifacts are `unsupported` until the RC
-  or stable publication gate is intentionally cut.
+- Published tags and uploaded release artifacts are `unsupported` until the
+  stable publication gate is intentionally cut. The local `v2.0.0` tag decision
+  is release evidence, not upload evidence.
 - Remote release downloads are `unsupported`.
 - Remote checksum fetching is `unsupported`.
 - Automatic replacement of the running executable is `unsupported`.
 - Installer execution tests on every platform are `unsupported`.
 - Dependency audit remains `unsupported`.
-- Stable release publication is `blocked:` until stable tag, external platform,
-  upload, and publication destination evidence exist. Local artifact,
-  checksum, and Windows installer smoke evidence are recorded in
+- Stable release publication is `blocked:` until external platform, upload, and
+  publication destination evidence exist. Local artifact, checksum, Windows
+  installer smoke, and stable tag decision evidence are recorded in
   `StableRelease.md`.
 
 ## Platform Limits

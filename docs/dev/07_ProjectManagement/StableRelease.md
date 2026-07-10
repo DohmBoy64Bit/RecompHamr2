@@ -1,9 +1,9 @@
 # Stable Release Gate
 
 Phase 27 records stable-release readiness for the local checkout at commit
-`6a095dc`, plus local artifact, checksum, and Windows installer smoke evidence
-generated after commit `95269b3`. This is a local gate record, not a published
-stable release.
+`6a095dc`, plus local artifact, checksum, Windows installer smoke, and local
+stable tag decision evidence generated after commit `95269b3`. This is a local
+gate record, not an uploaded or externally published stable release.
 
 ## Local Gate Result
 
@@ -49,17 +49,23 @@ Windows installer smoke evidence:
 The smoke installed `recomphamr.exe` into a temporary directory and the
 installed binary printed diagnostic output successfully.
 
+## Local Stable Tag Decision
+
+The local stable tag decision is `v2.0.0`. The tag must be created only after
+the release-memory docs are committed and `make verify` passes for that commit.
+This tag is local evidence until it is pushed or otherwise published with the
+release artifacts.
+
 ## Blocked Publication Conditions
 
 Stable release publication remains `blocked:` until the release owner records:
 
-- an intentional stable tag decision;
 - external CI or platform matrix evidence where required;
 - publication destination and upload evidence.
 
-No published stable release, stable tag, uploaded artifact, remote download,
-remote checksum fetch, automatic replacement, external CI result, or
-platform-wide installer execution claim exists in this checkout.
+No uploaded artifact, remote download, remote checksum fetch, automatic
+replacement, external CI result, publication destination, or platform-wide
+installer execution claim exists in this checkout.
 
 ## Post-Parity Feature Gate
 

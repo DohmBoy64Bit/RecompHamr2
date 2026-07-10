@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- No post-parity feature intake is open until stable publication evidence is
+  recorded.
+
+## v2.0.0
+
+- Recorded the local stable release gate, six local release artifacts, verified
+  `SHA256SUMS`, Windows installer smoke evidence, and the local `v2.0.0` tag
+  decision.
 - Added durable governance, verification, architecture, parity, testing, and project memory docs.
 - Added diagnostic-only Go skeleton and canonical `make verify` entrypoint.
 - Recorded Phase 0 inventory from `DohmBoy64Bit/RecompHamr` commit `259a450e93af48437ee23663e5ca66cdc1ab8569`.

@@ -136,9 +136,10 @@ Cut the stable release when all parity, docs, coverage, security, install, and
 smoke gates pass. Publish artifacts only after checksum verification and
 fresh-install validation. In this checkout, Phase 27 records local stable-gate
 readiness, generated artifacts for six targets, verified `dist/SHA256SUMS`, and
-Windows installer smoke evidence in `StableRelease.md`; publication remains
-`blocked:` because no stable tag, external CI/platform evidence, uploaded
-artifact evidence, or publication destination evidence exists locally.
+Windows installer smoke evidence in `StableRelease.md`. The local stable tag
+decision is `v2.0.0`; publication remains `blocked:` because no external
+CI/platform evidence, uploaded artifact evidence, or publication destination
+evidence exists locally.
 
 ### Phase 28 — Post-Parity Feature Intake
 
