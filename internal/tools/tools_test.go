@@ -15,6 +15,40 @@ import (
 	"time"
 )
 
+func helperCommand(ctx context.Context, mode string) *exec.Cmd {
+	args := []string{"-test.run=TestHelperProcess", "--", mode}
+	cmd := exec.CommandContext(ctx, os.Args[0], args...)
+	cmd.Env = append(os.Environ(), "RECOMPHAMR_TOOL_HELPER=1")
+	return cmd
+}
+
+func TestHelperProcess(t *testing.T) {
+	if os.Getenv("RECOMPHAMR_TOOL_HELPER") != "1" {
+		return
+	}
+	mode := ""
+	for i, arg := range os.Args {
+		if arg == "--" && i+1 < len(os.Args) {
+			mode = os.Args[i+1]
+			break
+		}
+	}
+	switch mode {
+	case "hi":
+		os.Stdout.WriteString("hi\n")
+	case "cloned":
+		os.Stdout.WriteString("cloned\n")
+	case "fail":
+		os.Stdout.WriteString("nope\n")
+		os.Exit(7)
+	case "sleep":
+		time.Sleep(time.Second)
+	default:
+		os.Exit(2)
+	}
+	os.Exit(0)
+}
+
 func TestSchemas(t *testing.T) {
 	schemas := Schemas()
 	if got := len(schemas); got != 6 {
@@ -68,13 +102,6 @@ func TestReadWriteEditFile(t *testing.T) {
 }
 
 func TestPowerShell(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("PowerShell executable is guaranteed for this Windows-focused runtime test only")
-	}
-	out := PowerShell(context.Background(), "Write-Output hi", 5*time.Second)
-	if !strings.Contains(out, "hi") {
-		t.Fatalf("PowerShell() = %q, want hi", out)
-	}
 	if !IsFailure(PowerShell(context.Background(), "", time.Second)) {
 		t.Fatal("empty PowerShell command should fail")
 	}
@@ -82,6 +109,18 @@ func TestPowerShell(t *testing.T) {
 	cancel()
 	if out := PowerShell(ctx, "Write-Output hi", time.Second); !IsFailure(out) || !strings.Contains(out, "cancelled") {
 		t.Fatalf("cancelled PowerShell output = %q", out)
+	}
+	origCommand := commandContext
+	defer func() { commandContext = origCommand }()
+	commandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return helperCommand(ctx, "hi")
+	}
+	out := PowerShell(context.Background(), "Write-Output hi", 5*time.Second)
+	if !strings.Contains(out, "hi") {
+		t.Fatalf("PowerShell() = %q, want hi", out)
+	}
+	commandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return helperCommand(ctx, "fail")
 	}
 	if !IsFailure(PowerShell(context.Background(), "exit 7", 5*time.Second)) {
 		t.Fatal("failing PowerShell command should fail")
@@ -111,7 +150,7 @@ func TestShellWindowsBranchWithCommandSeam(t *testing.T) {
 	commandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		seen = name
 		seenArgs = append([]string{}, args...)
-		return origCommand(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", "Write-Output hi")
+		return helperCommand(ctx, "hi")
 	}
 	out := PowerShell(context.Background(), "ignored", time.Second)
 	if seen != "powershell" || !strings.Contains(strings.Join(seenArgs, " "), "-NonInteractive") || !strings.Contains(out, "hi") {
@@ -126,10 +165,7 @@ func TestShellLinuxAndTimeoutBranchesWithSeams(t *testing.T) {
 	seen := ""
 	commandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		seen = name
-		if name == "pwsh" {
-			return origCommand(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", "Write-Output hi")
-		}
-		return origCommand(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", "Write-Output hi")
+		return helperCommand(ctx, "hi")
 	}
 	out := Bash(context.Background(), "ignored", 0)
 	if seen != "/bin/sh" || !strings.Contains(out, "hi") {
@@ -140,26 +176,21 @@ func TestShellLinuxAndTimeoutBranchesWithSeams(t *testing.T) {
 		t.Fatalf("non-windows powershell branch seen=%q out=%q", seen, out)
 	}
 
-	commandContext = origCommand
-	runtimeGOOS = runtime.GOOS
-	sleep := "Start-Sleep -Milliseconds 200"
-	if runtime.GOOS != "windows" {
-		sleep = "sleep 1"
+	commandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
+		return helperCommand(ctx, "sleep")
 	}
-	if out := Bash(context.Background(), sleep, time.Nanosecond); !IsFailure(out) || !strings.Contains(out, "timeout") {
+	if out := Bash(context.Background(), "ignored", time.Nanosecond); !IsFailure(out) || !strings.Contains(out, "timeout") {
 		t.Fatalf("timeout output = %q", out)
 	}
 
-	if runtime.GOOS == "windows" {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		go func() {
-			time.Sleep(25 * time.Millisecond)
-			cancel()
-		}()
-		if out := PowerShell(ctx, "Start-Sleep -Seconds 5", time.Minute); !IsFailure(out) || !strings.Contains(out, "cancelled") {
-			t.Fatalf("cancelled during command output = %q", out)
-		}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		time.Sleep(25 * time.Millisecond)
+		cancel()
+	}()
+	if out := PowerShell(ctx, "ignored", time.Minute); !IsFailure(out) || !strings.Contains(out, "cancelled") {
+		t.Fatalf("cancelled during command output = %q", out)
 	}
 }
 
@@ -304,7 +335,7 @@ func TestToolFailureSeams(t *testing.T) {
 		t.Fatal("git failure should surface")
 	}
 	commandContext = func(ctx context.Context, name string, args ...string) *exec.Cmd {
-		return origCommand(ctx, "powershell", "-NoProfile", "-Command", "Write-Output cloned")
+		return helperCommand(ctx, "cloned")
 	}
 	if out := Repomixr(context.Background(), "https://github.com/a/b", t.TempDir()); !strings.Contains(out, "cloned") {
 		t.Fatalf("repomixr success seam output = %q", out)
