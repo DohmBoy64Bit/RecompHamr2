@@ -2,11 +2,14 @@
 
 ## Foundation Status
 
-- Phase 63 repository transition started: local and remote RecompHamr2 heads are
-  verified at `20727e5ebf4fb8492abd5dee77d70f3c020f1970`; CodeHamr upstream is
-  pinned at `85409d167b97bec64ee330d51872d358d3ce2d57`. GitHub rename, archive,
-  fork, tag, and final remote evidence remain pending until the documented
-  lineage operations complete.
+- Phase 63 repository lineage and freeze is complete. RecompHamr2's product
+  implementation baseline is `20727e5ebf4fb8492abd5dee77d70f3c020f1970`;
+  annotated tag `recomphamr2-feature-reference-2026-07-13` points to lineage
+  checkpoint `888c20f`. The original repository is archived at
+  `DohmBoy64Bit/RecompHamr-Legacy`. The canonical `DohmBoy64Bit/RecompHamr`
+  repository is an unarchived fork of `codehamr/codehamr`; fork and upstream
+  `main` both resolve to `85409d167b97bec64ee330d51872d358d3ce2d57`, and
+  GitHub identifies the retained root license as MIT.
 
 - Phase 0: complete for source inventory using `https://github.com/DohmBoy64Bit/RecompHamr` at commit `259a450e93af48437ee23663e5ca66cdc1ab8569`.
 - Phase 1: durable governance docs created.

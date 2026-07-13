@@ -31,3 +31,17 @@ attribution and this provenance record are permanent.
 Repository URLs, archive state, fork relationships, default branches, tags, and
 commit identities are runtime facts. Verify them with Git and GitHub metadata;
 do not infer them from this document when the remote state may have changed.
+
+## Phase 63 Verified Remote State
+
+Verified on 2026-07-13:
+
+- `https://github.com/DohmBoy64Bit/RecompHamr2` retains the feature-reference
+  implementation and annotated tag.
+- `https://github.com/DohmBoy64Bit/RecompHamr-Legacy` is archived and retains
+  the original non-fork history.
+- `https://github.com/DohmBoy64Bit/RecompHamr` is an unarchived GitHub fork of
+  `codehamr/codehamr`.
+- Both fork and upstream `main` resolve to
+  `85409d167b97bec64ee330d51872d358d3ce2d57`.
+- GitHub reports the fork's root `LICENSE` as MIT.
