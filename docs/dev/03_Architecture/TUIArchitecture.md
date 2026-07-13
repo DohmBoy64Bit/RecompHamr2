@@ -8,16 +8,18 @@ The RecompHamr TUI is inspired by the terminal-first workflow quality of
 OpenCode, but it must not copy OpenCode 1:1. RecompHamr uses its own
 evidence-first terminal layout:
 
-- Header: brand, domain line, current mode, active model, and safety line.
-- Signals band: memory freshness, active skill, MCP gate state, pending tool,
-  and context state.
-- Transcript: user, assistant, command, and tool-visible conversation lines.
-- Evidence column: context budget and verified working state separated from
-  chat prose.
-- Composer: prompt entry area.
+- Centered launcher: brand, domain line, prompt panel, model/mode/status line,
+  key hints, and setup tip.
+- Transcript-first chat: recent user, assistant, tool, MCP, blocked,
+  unsupported, unverified, status, attachment, and note lines occupy the main
+  surface without a permanent debug board.
+- Floating command palette: registry-backed slash command rows render as an
+  overlay above the launcher or chat surface.
+- Bottom composer: multiline prompt entry and model/skill/MCP/context status
+  stay in the bottom command area.
 
-Compact terminals collapse signals and evidence into status chips. This
-improves narrow-terminal usability while preserving the same state.
+Compact terminals keep the same launcher, transcript, palette, composer, and
+status concepts with reduced width and truncated transcript cards where needed.
 
 ## Phase 7 Shell Contract
 
@@ -28,6 +30,14 @@ improves narrow-terminal usability while preserving the same state.
   resize handling, cancellation, quit, status text, and redacted debug lines.
 - A thin Bubble Tea `BubbleModel` adapter that translates Bubble Tea key and
   window-size messages into the pure model.
+
+Bubble Tea work must start by reading the documentation for the active module
+version. The current implementation uses `charm.land/bubbletea/v2` and
+`charm.land/lipgloss/v2`. Bubble Tea v2 requires `View() tea.View`,
+`tea.KeyPressMsg` for key presses, `tea.PasteMsg` for bracketed paste, and
+declarative `tea.View` fields for terminal behavior. The live TUI sets
+`AltScreen`, `MouseModeCellMotion`, focus reporting, window title, and cursor
+shape in `View()` rather than through imperative startup commands.
 
 The TUI may dispatch slash commands through `internal/commands` and redact debug
 text through `internal/security`. It must not execute tools, own the agent loop,
@@ -96,8 +106,13 @@ Required RecompHamr-specific outcomes:
 
 - branded startup state with `RECOMP HAMR` wide branding and compact
   `RecompHamr` branding;
-- dark terminal visual system using RecompHamr-owned text tokens before ANSI
-  color is layered in later;
+- dark terminal visual system using RecompHamr-owned hammer orange, cyan,
+  soft green, warning yellow, blocked red, and neutral gray roles;
+- centered startup launcher, transcript-first chat surface, floating command
+  palette, bottom composer/status panel, and compact responsive rendering;
+- Bubble Tea v2 styled view content with Lip Gloss color roles for logo,
+  launcher, composer panel, palette overlay, selected command, assistant,
+  tool/MCP, blocked, warning, muted, hint, and tip states;
 - persistent model, memory, skill, MCP, context, tool, and permission status;
 - registry-driven slash command palette and completion;
 - professional transcript blocks for assistant, user, command, tool, MCP,

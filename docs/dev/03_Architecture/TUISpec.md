@@ -37,13 +37,13 @@ red blocked state. The exact OpenCode green-heavy palette is not used.
 
 ## Required Screens
 
-1. Startup/welcome: brand, domain, active model, memory status, MCP summary,
-   safety line, composer, and key hints.
-2. Wide chat: transcript plus persistent footer/status band.
+1. Startup/welcome: centered brand, domain, prompt panel, model/mode/status
+   line, key hints, and setup tip.
+2. Wide chat: transcript-first surface with bottom composer/status panel.
 3. Compact chat: same state collapsed without losing model, memory, skill, MCP,
    pending tool, or blocked status.
-4. Slash palette: registry-driven command list with selected row, summary,
-   argument hint, and side-effect marker.
+4. Slash palette: registry-driven floating command overlay with selected row,
+   summary, usage, and side-effect metadata from command docs.
 5. Active skill: visible skill name and unlocked MCP/tool implications.
 6. MCP state: disconnected, connected, error, and disabled tool states.
 7. Tool transcript: PowerShell/tool/MCP command block with result or blocked
@@ -70,6 +70,14 @@ red blocked state. The exact OpenCode green-heavy palette is not used.
   omit them or label them `unverified`.
 - Tool output is bounded and styled as output, not assistant prose.
 - Secrets are redacted before debug or transcript rendering.
+- The plain renderer stays deterministic for tests, while the Bubble Tea view
+  uses Lip Gloss styling and layout composition for the live terminal.
+- Bubble Tea rendering must use the current Bubble Tea docs before design or
+  implementation. For Bubble Tea v2, `View()` returns `tea.View`; terminal
+  behavior such as alt screen, mouse mode, focus reporting, window title, and
+  cursor shape is declared on the returned view; key handling uses
+  `tea.KeyPressMsg`; bracketed paste uses `tea.PasteMsg`; styling uses Lip
+  Gloss in the TUI boundary.
 - Compact mode must not overlap or truncate critical status labels.
 - Golden render tests are required for every required screen.
 

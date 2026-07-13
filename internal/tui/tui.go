@@ -5,7 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"recomphamr2/internal/commands"
 	"recomphamr2/internal/security"
@@ -206,8 +207,16 @@ func (b BubbleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the current Bubble Tea model.
-func (b BubbleModel) View() string {
-	return b.State.Render()
+func (b BubbleModel) View() tea.View {
+	view := tea.NewView(b.State.RenderStyled())
+	view.AltScreen = true
+	view.MouseMode = tea.MouseModeCellMotion
+	view.ReportFocus = true
+	view.WindowTitle = "RecompHamr"
+	view.Cursor = tea.NewCursor(styledComposerCursorX(b.State), styledComposerCursorY(b.State))
+	view.Cursor.Shape = tea.CursorBar
+	view.Cursor.Blink = true
+	return view
 }
 
 // Submit dispatches slash commands or appends plain user text.
@@ -286,6 +295,11 @@ func (m Model) Render() string {
 	return m.RenderWithLayout(m.Layout)
 }
 
+// RenderStyled returns the ANSI-styled Bubble Tea view content.
+func (m Model) RenderStyled() string {
+	return m.RenderStyledWithLayout(m.Layout)
+}
+
 // RenderWithLayout returns the full RecompHamr initiative layout.
 func (m Model) RenderWithLayout(layout Layout) string {
 	if layout.Width <= 0 {
@@ -298,6 +312,17 @@ func (m Model) RenderWithLayout(layout Layout) string {
 		return m.renderCompact(layout)
 	}
 	return m.renderWide(layout)
+}
+
+// RenderStyledWithLayout returns styled content for Bubble Tea rendering.
+func (m Model) RenderStyledWithLayout(layout Layout) string {
+	if layout.Width <= 0 {
+		layout.Width = DefaultWidth
+	}
+	if layout.Height <= 0 {
+		layout.Height = DefaultHeight
+	}
+	return m.renderBubble(layout)
 }
 
 // CompleteCommand returns matching slash command names.
@@ -321,60 +346,248 @@ func Improvements() []string {
 }
 
 func (m Model) renderWide(layout Layout) string {
-	var b strings.Builder
-	writeHeader(&b, layout, false)
-	writeDivider(&b, layout.Width)
-	fmt.Fprintf(&b, "signals                         transcript                                  evidence\n")
-	fmt.Fprintf(&b, "memory %-22s %s\n", chip(layout.MemoryStatus), transcriptLine(m.Transcript, 0))
-	fmt.Fprintf(&b, "skill  %-22s %s\n", chip(layout.ActiveSkill), transcriptLine(m.Transcript, 1))
-	fmt.Fprintf(&b, "mcp    %-22s %s\n", chip(layout.MCPStatus), transcriptLine(m.Transcript, 2))
-	fmt.Fprintf(&b, "tool   %-22s %s\n", chip(layout.PendingTool), transcriptLine(m.Transcript, 3))
-	fmt.Fprintf(&b, "context %-21s %s\n", chip(layout.ContextStatus), transcriptLine(m.Transcript, 4))
-	if len(m.Transcript) == 0 {
-		fmt.Fprintf(&b, "ready  %-22s %s\n", chip("verified idle"), "Ask RecompHamr, run /help, or activate a skill.")
-	}
-	writePalette(&b, m)
-	writeFooter(&b, m)
-	writeComposer(&b, m)
-	return strings.TrimRight(b.String(), "\n")
+	return m.renderPlain(layout, false)
 }
 
 func (m Model) renderCompact(layout Layout) string {
+	return m.renderPlain(layout, true)
+}
+
+func (m Model) renderPlain(layout Layout, compact bool) string {
 	var b strings.Builder
-	writeHeader(&b, layout, true)
-	fmt.Fprintf(&b, "status %s %s %s %s %s\n", chip("memory:"+layout.MemoryStatus), chip("skill:"+layout.ActiveSkill), chip("mcp:"+layout.MCPStatus), chip("tool:"+layout.PendingTool), chip("context:"+layout.ContextStatus))
-	writeDivider(&b, layout.Width)
-	for _, line := range m.Transcript {
-		fmt.Fprintf(&b, "%s\n", transcriptBlock(line))
+	if len(m.Transcript) == 0 {
+		b.WriteString(startupPlain(m, layout, compact))
+	} else {
+		b.WriteString(chatPlain(m, layout, compact))
 	}
-	writePalette(&b, m)
-	writeFooter(&b, m)
-	writeComposer(&b, m)
+	if len(m.PaletteRows()) > 0 {
+		b.WriteString("\n")
+		b.WriteString(palettePlain(m, layout))
+	}
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func writeHeader(b *strings.Builder, layout Layout, compact bool) {
+func startupPlain(m Model, layout Layout, compact bool) string {
+	width := renderWidth(layout.Width)
 	brand := brandWide
 	if compact {
 		brand = brandCompact
 	}
-	fmt.Fprintf(b, "%s\n", brand)
-	fmt.Fprintf(b, "%s\n", domainLine)
-	fmt.Fprintf(b, "mode %s  model %s\n", chip(layout.Mode), chip(layout.ActiveModel))
-	fmt.Fprintf(b, "safety %s\n", safetyLine)
+	lines := []string{
+		centerText(width, brand),
+		centerText(width, domainLine),
+		"",
+		centerText(width, composerPrompt(m)),
+		centerText(width, statusBar(layout)),
+		centerText(width, "/ commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit"),
+		"",
+		centerText(width, "Tip: keep evidence in .rehamr/REPHAMR_STATE.md"),
+	}
+	return strings.Join(lines, "\n")
 }
 
-func writeDivider(b *strings.Builder, width int) {
+func chatPlain(m Model, layout Layout, compact bool) string {
+	width := renderWidth(layout.Width)
+	var b strings.Builder
+	for _, line := range visibleTranscript(m.Transcript, 8) {
+		fmt.Fprintf(&b, "%s\n", transcriptCard(line, width, compact))
+	}
+	if m.Status != "" {
+		fmt.Fprintf(&b, "%s\n", transcriptCard("status: "+m.Status, width, compact))
+	}
+	if m.DebugEnabled && len(m.DebugLog) > 0 {
+		fmt.Fprintf(&b, "%s\n", transcriptCard("status: debug "+m.DebugLog[len(m.DebugLog)-1], width, compact))
+	}
+	fmt.Fprintf(&b, "\n%s\n", composerPrompt(m))
+	fmt.Fprintf(&b, "%s\n", statusBar(layout))
+	fmt.Fprintf(&b, "/ commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit")
+	return b.String()
+}
+
+func palettePlain(m Model, layout Layout) string {
+	width := renderWidth(layout.Width)
+	rows := m.PaletteRows()
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n", centerText(width, "Command Palette"))
+	for _, row := range rows {
+		fmt.Fprintf(&b, "%s\n", centerText(width, row))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m Model) renderBubble(layout Layout) string {
+	if len(m.Transcript) == 0 {
+		return m.renderBubbleStartup(layout)
+	}
+	return m.renderBubbleChat(layout)
+}
+
+func (m Model) renderBubbleStartup(layout Layout) string {
+	width, height := bubbleSize(layout)
+	panelWidth := launcherPanelWidth(width)
+	panel := lipgloss.JoinVertical(
+		lipgloss.Left,
+		tuiStyleLogo(panelWidth).Render(brandWide),
+		tuiStyleMuted().Width(panelWidth).Align(lipgloss.Center).Render(domainLine),
+		"",
+		tuiStyleComposerPanel(panelWidth).Render(composerPrompt(m)+"\n\n"+statusBar(layout)),
+		tuiStyleHints().Width(panelWidth).Render("Tab complete    / commands    Ctrl+C cancel/quit    Ctrl+D exit"),
+		"",
+		tuiStyleTip().Width(panelWidth).Render("Tip: use /init-re to create reverse-engineering memory before long sessions."),
+	)
+	if len(m.PaletteRows()) > 0 {
+		panel = lipgloss.JoinVertical(lipgloss.Left, paletteBubble(m, width), panel)
+	}
+	top := launcherTopPadding(height)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, strings.Repeat("\n", top)+panel)
+}
+
+func (m Model) renderBubbleChat(layout Layout) string {
+	width, height := bubbleSize(layout)
+	bodyHeight := height - 5
+	if bodyHeight < 6 {
+		bodyHeight = 6
+	}
+	body := transcriptBubble(m, width, bodyHeight)
+	composer := tuiStyleComposerPanel(width).Render(composerPrompt(m) + "\n\n" + statusBar(layout))
+	footer := tuiStyleHints().Render("/ commands    Tab complete    Ctrl+C cancel/quit    Ctrl+D exit")
+	content := lipgloss.JoinVertical(lipgloss.Left, body, composer, footer)
+	if len(m.PaletteRows()) > 0 {
+		content = overlayPalette(content, paletteBubble(m, width), width)
+	}
+	return lipgloss.Place(width, height, lipgloss.Left, lipgloss.Top, content)
+}
+
+func transcriptBubble(m Model, width int, height int) string {
+	var lines []string
+	for _, line := range visibleTranscript(m.Transcript, height) {
+		lines = append(lines, styleTranscriptLine(line, width))
+	}
+	if m.Status != "" {
+		lines = append(lines, styleTranscriptLine("status: "+m.Status, width))
+	}
+	if len(lines) == 0 {
+		lines = append(lines, tuiStyleMuted().Render("No transcript yet."))
+	}
+	return lipgloss.NewStyle().Width(width).Height(height).Render(strings.Join(lines, "\n\n"))
+}
+
+func paletteBubble(m Model, width int) string {
+	rows := m.PaletteRows()
+	panelWidth := width - 28
+	if panelWidth < 44 {
+		panelWidth = width
+	}
+	if panelWidth > 76 {
+		panelWidth = 76
+	}
+	var body []string
+	body = append(body, tuiStylePaletteTitle().Render("COMMAND PALETTE")+"  "+tuiStyleMuted().Render("esc"))
+	for _, row := range rows {
+		if strings.HasPrefix(row, ">") {
+			body = append(body, tuiStyleSelected().Width(panelWidth-4).Render(strings.TrimSpace(row[1:])))
+			continue
+		}
+		body = append(body, tuiStylePaletteRow().Render(strings.TrimSpace(row)))
+	}
+	return tuiStyleOverlay(panelWidth).Render(strings.Join(body, "\n"))
+}
+
+func overlayPalette(content string, palette string, width int) string {
+	return lipgloss.JoinVertical(lipgloss.Center, palette, content)
+}
+
+func styleTranscriptLine(line string, width int) string {
+	label := strings.Fields(transcriptBlock(line))[0]
+	text := transcriptBlock(line)
+	style := tuiStyleTranscript(width)
+	switch label {
+	case "user":
+		style = tuiStyleUser(width)
+	case "assistant":
+		style = tuiStyleAssistant(width)
+	case "tool", "mcp":
+		style = tuiStyleTool(width)
+	case "blocked":
+		style = tuiStyleBlockedCard(width)
+	case "unsupported", "unverified":
+		style = tuiStyleWarningCard(width)
+	}
+	return style.Render(text)
+}
+
+func composerPrompt(m Model) string {
+	text := composerView(m)
+	if strings.TrimSpace(text) == "" {
+		return `Ask RecompHamr... "map this function"`
+	}
+	return "composer > " + text
+}
+
+func statusBar(layout Layout) string {
+	return fmt.Sprintf("Build * %s * %s * skill %s * mcp %s * context %s", layout.ActiveModel, layout.Mode, layout.ActiveSkill, layout.MCPStatus, layout.ContextStatus)
+}
+
+func visibleTranscript(lines []string, limit int) []string {
+	if limit <= 0 || len(lines) <= limit {
+		return append([]string(nil), lines...)
+	}
+	return append([]string(nil), lines[len(lines)-limit:]...)
+}
+
+func transcriptCard(line string, width int, compact bool) string {
+	text := transcriptBlock(line)
+	if compact && len(text) > width {
+		return text[:width]
+	}
+	return text
+}
+
+func centerText(width int, text string) string {
+	if len(text) >= width {
+		return text
+	}
+	return strings.Repeat(" ", (width-len(text))/2) + text
+}
+
+func bubbleSize(layout Layout) (int, int) {
+	width := layout.Width
 	if width <= 0 {
 		width = DefaultWidth
 	}
-	if width > 96 {
-		width = 96
+	height := layout.Height
+	if height <= 0 {
+		height = DefaultHeight
 	}
-	if width < 24 {
-		width = 24
+	if width < 40 {
+		width = 40
 	}
-	fmt.Fprintf(b, "%s\n", strings.Repeat("-", width))
+	return width, height
+}
+
+func launcherPanelWidth(width int) int {
+	panelWidth := width - 16
+	if panelWidth > 84 {
+		panelWidth = 84
+	}
+	if panelWidth < 44 {
+		panelWidth = width - 4
+	}
+	if panelWidth < 36 {
+		panelWidth = 36
+	}
+	return panelWidth
+}
+
+func launcherTopPadding(height int) int {
+	if height <= 18 {
+		return 1
+	}
+	top := height / 5
+	if top > 6 {
+		return 6
+	}
+	return top
 }
 
 func chip(text string) string {
@@ -383,13 +596,6 @@ func chip(text string) string {
 		text = "unverified"
 	}
 	return "[" + text + "]"
-}
-
-func transcriptLine(lines []string, index int) string {
-	if index >= len(lines) {
-		return ""
-	}
-	return transcriptBlock(lines[index])
 }
 
 func transcriptBlock(line string) string {
@@ -518,36 +724,17 @@ func (m Model) recall(delta int) Model {
 	return m
 }
 
-func writeFooter(b *strings.Builder, m Model) {
-	if m.Status != "" {
-		fmt.Fprintf(b, "status > %s\n", m.Status)
+func renderWidth(width int) int {
+	if width <= 0 {
+		width = DefaultWidth
 	}
-	if m.DebugEnabled && len(m.DebugLog) > 0 {
-		fmt.Fprintf(b, "debug > %s\n", m.DebugLog[len(m.DebugLog)-1])
+	if width > 110 {
+		width = 110
 	}
-	fmt.Fprintf(b, "hints  / commands  Tab complete  Ctrl+C cancel/quit  Ctrl+D exit\n")
-}
-
-func writePalette(b *strings.Builder, m Model) {
-	rows := m.PaletteRows()
-	if len(rows) == 0 {
-		return
+	if width < 32 {
+		width = 32
 	}
-	fmt.Fprintf(b, "commands\n")
-	for _, row := range rows {
-		fmt.Fprintf(b, "%s\n", row)
-	}
-}
-
-func writeComposer(b *strings.Builder, m Model) {
-	lines := strings.Split(composerView(m), "\n")
-	for i, line := range lines {
-		if i == 0 {
-			fmt.Fprintf(b, "composer > %s\n", line)
-			continue
-		}
-		fmt.Fprintf(b, "           %s\n", line)
-	}
+	return width
 }
 
 func composerView(m Model) string {
@@ -600,11 +787,14 @@ func bubbleEvent(msg tea.Msg) (Event, bool) {
 	switch typed := msg.(type) {
 	case tea.WindowSizeMsg:
 		return Event{Width: typed.Width, Height: typed.Height}, true
-	case tea.KeyMsg:
-		if len(typed.Runes) > 0 {
-			return Event{Text: string(typed.Runes)}, true
+	case tea.KeyPressMsg:
+		key := typed.Key()
+		if key.Text != "" {
+			return Event{Text: key.Text}, true
 		}
 		return Event{Key: bubbleKey(typed.String())}, true
+	case tea.PasteMsg:
+		return Event{Paste: typed.Content}, true
 	default:
 		return Event{}, false
 	}
@@ -629,4 +819,102 @@ func commandMatches(prefix string) []commands.Command {
 		}
 	}
 	return out
+}
+
+func tuiStyleSelected() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("16")).Background(lipgloss.Color("45")).Bold(true)
+}
+
+func tuiStyleLogo(width int) lipgloss.Style {
+	return lipgloss.NewStyle().Width(width).Foreground(lipgloss.Color("214")).Bold(true).Align(lipgloss.Center)
+}
+
+func tuiStyleMuted() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+}
+
+func tuiStyleHints() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("120")).Bold(true)
+}
+
+func tuiStyleTip() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+}
+
+func tuiStyleComposerPanel(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Width(width).
+		Padding(1, 2).
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(lipgloss.Color("45")).
+		Foreground(lipgloss.Color("231")).
+		Background(lipgloss.Color("235"))
+}
+
+func tuiStyleTranscript(width int) lipgloss.Style {
+	return lipgloss.NewStyle().Width(width - 6).MarginLeft(2).Foreground(lipgloss.Color("250"))
+}
+
+func tuiStyleUser(width int) lipgloss.Style {
+	return tuiStyleTranscript(width).Border(lipgloss.NormalBorder(), false, false, false, true).BorderForeground(lipgloss.Color("45")).PaddingLeft(1)
+}
+
+func tuiStyleAssistant(width int) lipgloss.Style {
+	return tuiStyleTranscript(width).Foreground(lipgloss.Color("120")).PaddingLeft(3)
+}
+
+func tuiStyleTool(width int) lipgloss.Style {
+	return tuiStyleTranscript(width).Foreground(lipgloss.Color("109")).PaddingLeft(3)
+}
+
+func tuiStyleBlockedCard(width int) lipgloss.Style {
+	return tuiStyleTranscript(width).Foreground(lipgloss.Color("196")).Bold(true).PaddingLeft(3)
+}
+
+func tuiStyleWarningCard(width int) lipgloss.Style {
+	return tuiStyleTranscript(width).Foreground(lipgloss.Color("220")).Bold(true).PaddingLeft(3)
+}
+
+func tuiStylePaletteTitle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("120")).Bold(true)
+}
+
+func tuiStylePaletteRow() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+}
+
+func tuiStyleOverlay(width int) lipgloss.Style {
+	return lipgloss.NewStyle().
+		Width(width).
+		Padding(1, 2).
+		Background(lipgloss.Color("235")).
+		Border(lipgloss.NormalBorder(), false, true, false, true).
+		BorderForeground(lipgloss.Color("238"))
+}
+
+func composerCursorX(m Model) int {
+	lines := strings.Split(composerView(m), "\n")
+	return len("composer > ") + len(lines[len(lines)-1])
+}
+
+func composerCursorY(m Model) int {
+	return strings.Count(m.Render(), "\n")
+}
+
+func styledComposerCursorX(m Model) int {
+	if len(m.Transcript) == 0 {
+		width, _ := bubbleSize(m.Layout)
+		panelWidth := launcherPanelWidth(width)
+		panelLeft := (width - panelWidth) / 2
+		return panelLeft + 4 + len(`Ask RecompHamr... "map this function"`)
+	}
+	return composerCursorX(m)
+}
+
+func styledComposerCursorY(m Model) int {
+	if len(m.Transcript) == 0 {
+		_, height := bubbleSize(m.Layout)
+		return launcherTopPadding(height) + 4
+	}
+	return composerCursorY(m)
 }

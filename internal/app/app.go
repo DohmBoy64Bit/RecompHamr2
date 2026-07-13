@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"recomphamr2/internal/agent"
 	"recomphamr2/internal/commands"
@@ -208,7 +208,6 @@ func ComposeRuntime(opts Options) (Runtime, error) {
 	model.Layout.MCPStatus = "manager wired"
 	model.Layout.ContextStatus = fmt.Sprintf("context=%d", profile.ContextSize)
 	model.Layout.MemoryStatus = memStatus
-	model.Transcript = append(model.Transcript, "runtime: local product shell composed")
 	return Runtime{
 		ProjectDir:    projectDir,
 		Config:        cfg,
@@ -324,7 +323,7 @@ func (m liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.applyAgentResult(typed), nil
 	default:
 		submitted := ""
-		if key, ok := msg.(tea.KeyMsg); ok && key.String() == tui.KeyEnter {
+		if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == tui.KeyEnter {
 			submitted = strings.TrimSpace(m.BubbleModel.State.Composer)
 		}
 		updated, cmd := m.BubbleModel.Update(msg)
@@ -352,7 +351,7 @@ func (m liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the live Bubble Tea model.
-func (m liveModel) View() string {
+func (m liveModel) View() tea.View {
 	return m.BubbleModel.View()
 }
 

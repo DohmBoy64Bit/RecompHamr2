@@ -38,6 +38,10 @@ Use `pkg/` only for stable public APIs approved by an architecture decision.
 
 Strict separation of concerns is mandatory. Follow `docs/dev/03_Architecture/SeparationOfConcerns.md`; `make verify` runs `make archcheck` and fails on undocumented package imports.
 
+## Bubble Tea TUI Rule
+
+Before designing or changing the TUI, read the current Bubble Tea documentation for the version in use and the TUI architecture docs. TUI work must use Bubble Tea's model/update/view contract directly, use declarative `tea.View` fields for terminal behavior where supported, and keep styling in the TUI layer through Bubble Tea/Lip Gloss instead of ad hoc terminal side effects.
+
 ## Build, Test, And Development Commands
 
 - `make verify` runs the canonical local verification gate.

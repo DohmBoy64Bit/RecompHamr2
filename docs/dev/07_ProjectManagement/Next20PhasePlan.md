@@ -43,8 +43,8 @@ Record both names in goal packets, traceability rows, and status reports.
 | 32 | TUI Composer, Palette, And Completion UX | Corrective TUI hardening | complete |
 | 33 | TUI Transcript, Tool Blocks, And Runtime Feedback | Corrective TUI hardening | complete |
 | 34 | Windows Executable And End-User Launch Polish | Corrective packaging/runtime hardening | complete |
-| 35 | Post-Parity Feature Intake | Workflow Phase 15 | publication gate satisfied; intake criteria still required |
-| 36 | Extension Architecture Planning | Workflow Phase 15 extension planning | blocked until Phase 35 intake |
+| 35 | Post-Parity Feature Intake | Workflow Phase 15 | complete; Phase 36 approved as architecture-only planning |
+| 36 | Extension Architecture Planning | Workflow Phase 15 extension planning | approved next; implementation still blocked |
 
 ## Global Gates
 
@@ -279,11 +279,17 @@ Create a decision register for candidate enhancements such as safer permission
 prompts, session export/import, richer reverse-engineering dashboards,
 ACP/editor integration, and optional desktop shell.
 
+Phase 35 is complete. `FeatureIntake.md` records the intake gates, approved
+candidates, deferred candidates, and the decision to open Phase 36 as
+architecture-only extension planning. No feature implementation is approved
+without a separate goal packet.
+
 ### Phase 36 — Extension Architecture Planning
 
 Design post-parity extension boundaries for optional Rust helpers, external
 analyzers, plugin-style tools, richer MCP integrations, and future UI surfaces.
-No implementation begins until each feature has its own approved goal packet.
+Phase 35 approves this as the next phase, but implementation remains blocked
+until each feature has its own approved goal packet.
 
 ## Public Interfaces And Types
 

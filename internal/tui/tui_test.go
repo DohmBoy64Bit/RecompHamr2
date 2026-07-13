@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"recomphamr2/internal/commands"
 )
@@ -14,7 +14,7 @@ func TestSubmitAndRender(t *testing.T) {
 	model = model.Submit("hello")
 	model = model.Submit("/help")
 	view := model.Render()
-	if !strings.Contains(view, "RECOMP HAMR") || !strings.Contains(view, "user: hello") || !strings.Contains(view, "/models") {
+	if !strings.Contains(view, "user: hello") || !strings.Contains(view, "/models") || !strings.Contains(view, "Build *") {
 		t.Fatalf("Render() = %q", view)
 	}
 }
@@ -33,7 +33,7 @@ func TestRenderWideLayout(t *testing.T) {
 		MemoryStatus:  "fresh",
 	}
 	view := model.Render()
-	for _, want := range []string{"RECOMP HAMR", "signals", "transcript", "evidence", "memory [fresh]", "context [42k / 131k]", "hints  / commands", "composer >"} {
+	for _, want := range []string{"user: inspect binary", "assistant: gather evidence", "Build * lmstudio-amd", "skill n64-decomp", "mcp ghidra gated", "/ commands"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("wide render missing %q:\n%s", want, view)
 		}
@@ -44,13 +44,13 @@ func TestRenderCompactLayout(t *testing.T) {
 	model := New(commands.Environment{})
 	model.Transcript = []string{"user: narrow"}
 	view := model.RenderWithLayout(Layout{Width: 80, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "off", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
-	for _, want := range []string{"RecompHamr", "status [memory:fresh] [skill:core-re] [mcp:off]", "user: narrow", "composer >"} {
+	for _, want := range []string{"user: narrow", "Build * local", "skill core-re", "mcp off", "/ commands"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("compact render missing %q:\n%s", want, view)
 		}
 	}
-	if strings.Contains(view, "evidence deck") {
-		t.Fatalf("compact render should collapse evidence deck:\n%s", view)
+	if strings.Contains(view, "WORKBENCH") {
+		t.Fatalf("compact render should not use the old debug-board sections:\n%s", view)
 	}
 }
 
@@ -73,7 +73,7 @@ func TestDefaultLayoutAndImprovements(t *testing.T) {
 func TestRenderWithLayoutDefaultWidth(t *testing.T) {
 	model := New(commands.Environment{})
 	view := model.RenderWithLayout(Layout{})
-	if !strings.Contains(view, "signals") {
+	if !strings.Contains(view, "RECOMP HAMR") || !strings.Contains(view, "Ask RecompHamr") {
 		t.Fatalf("zero-width layout should default to wide render:\n%s", view)
 	}
 }
@@ -81,7 +81,7 @@ func TestRenderWithLayoutDefaultWidth(t *testing.T) {
 func TestRenderStartupAndHelperTokens(t *testing.T) {
 	model := New(commands.Environment{})
 	view := model.Render()
-	for _, want := range []string{"RECOMP HAMR", "RE . decomp . recomp", "safety local commands run", "Ask RecompHamr", "hints  / commands"} {
+	for _, want := range []string{"RECOMP HAMR", "RE . decomp . recomp", "Ask RecompHamr", "/ commands", "Tip:"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("startup render missing %q:\n%s", want, view)
 		}
@@ -89,25 +89,54 @@ func TestRenderStartupAndHelperTokens(t *testing.T) {
 	if got := chip(""); got != "[unverified]" {
 		t.Fatalf("chip(empty) = %q", got)
 	}
-	var b strings.Builder
-	writeHeader(&b, Layout{Mode: "ready", ActiveModel: "local"}, true)
-	if !strings.Contains(b.String(), "RecompHamr") || strings.Contains(b.String(), "RECOMP HAMR") {
-		t.Fatalf("compact header = %q", b.String())
+	if got := centerText(12, "HAMR"); got != "    HAMR" {
+		t.Fatalf("centerText = %q", got)
 	}
-	b.Reset()
-	writeDivider(&b, 0)
-	if got := strings.TrimSpace(b.String()); len(got) != 96 {
-		t.Fatalf("default divider length = %d text=%q", len(got), got)
+	if got := centerText(3, "HAMR"); got != "HAMR" {
+		t.Fatalf("centerText narrow = %q", got)
 	}
-	b.Reset()
-	writeDivider(&b, 10)
-	if got := strings.TrimSpace(b.String()); len(got) != 24 {
-		t.Fatalf("small divider length = %d text=%q", len(got), got)
+	if width, height := bubbleSize(Layout{Width: 10, Height: 0}); width != 40 || height != DefaultHeight {
+		t.Fatalf("bubbleSize = %d,%d", width, height)
 	}
-	b.Reset()
-	writeDivider(&b, 200)
-	if got := strings.TrimSpace(b.String()); len(got) != 96 {
-		t.Fatalf("large divider length = %d text=%q", len(got), got)
+	if width, height := bubbleSize(Layout{}); width != DefaultWidth || height != DefaultHeight {
+		t.Fatalf("bubbleSize default = %d,%d", width, height)
+	}
+	if got := launcherPanelWidth(120); got != 84 {
+		t.Fatalf("launcherPanelWidth wide = %d", got)
+	}
+	if got := launcherPanelWidth(42); got != 38 {
+		t.Fatalf("launcherPanelWidth compact = %d", got)
+	}
+	if got := launcherPanelWidth(20); got != 36 {
+		t.Fatalf("launcherPanelWidth tiny = %d", got)
+	}
+	if got := launcherTopPadding(40); got != 6 {
+		t.Fatalf("launcherTopPadding tall = %d", got)
+	}
+	if got := launcherTopPadding(32); got != 6 {
+		t.Fatalf("launcherTopPadding exact = %d", got)
+	}
+	if got := launcherTopPadding(20); got != 4 {
+		t.Fatalf("launcherTopPadding medium = %d", got)
+	}
+	if got := launcherTopPadding(18); got != 1 {
+		t.Fatalf("launcherTopPadding short = %d", got)
+	}
+	if got := renderWidth(200); got != 110 {
+		t.Fatalf("renderWidth large = %d", got)
+	}
+	if got := renderWidth(10); got != 32 {
+		t.Fatalf("renderWidth small = %d", got)
+	}
+}
+
+func TestRenderCompactStartup(t *testing.T) {
+	model := New(commands.Environment{})
+	view := model.RenderWithLayout(Layout{Width: 72, Mode: "ready", ActiveModel: "local", ActiveSkill: "none", MCPStatus: "gated", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
+	for _, want := range []string{"RecompHamr", "Ask RecompHamr", "Build * local", "/ commands", "Tip:"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("compact startup missing %q:\n%s", want, view)
+		}
 	}
 }
 
@@ -160,7 +189,7 @@ func TestPaletteRowsAndTabCompletion(t *testing.T) {
 		t.Fatalf("PaletteRows() = %#v", rows)
 	}
 	view := model.Render()
-	if !strings.Contains(view, "commands\n> /models") {
+	if !strings.Contains(view, "Command Palette") || !strings.Contains(view, "> /models") {
 		t.Fatalf("palette render = %q", view)
 	}
 	model, action := model.Update(Event{Key: KeyTab})
@@ -296,7 +325,7 @@ func TestRenderMultilineComposerAndEmptySubmit(t *testing.T) {
 	model := New(commands.Environment{})
 	model.Composer = "one\ntwo"
 	view := model.Render()
-	if !strings.Contains(view, "composer > one") || !strings.Contains(view, "           two") {
+	if !strings.Contains(view, "composer > one") || !strings.Contains(view, "two") {
 		t.Fatalf("multiline composer render=%q", view)
 	}
 	before := model
@@ -400,15 +429,15 @@ func TestBubbleModelAdapter(t *testing.T) {
 	if bubble.State.Layout.Width != 72 || bubble.State.Layout.Height != 24 || bubble.LastAction != ActionNone {
 		t.Fatalf("window update bubble=%+v", bubble)
 	}
-	updated, _ = bubble.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("h")})
+	updated, _ = bubble.Update(keyText("h"))
 	bubble = updated.(BubbleModel)
 	if bubble.State.Composer != "h" {
 		t.Fatalf("rune update composer=%q", bubble.State.Composer)
 	}
-	updated, _ = bubble.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, _ = bubble.Update(keyCode(tea.KeyEnter))
 	bubble = updated.(BubbleModel)
-	if bubble.LastAction != ActionSubmit || !strings.Contains(bubble.View(), "user: h") {
-		t.Fatalf("enter update bubble=%+v view=%q", bubble, bubble.View())
+	if bubble.LastAction != ActionSubmit || !strings.Contains(bubble.View().Content, "user: h") {
+		t.Fatalf("enter update bubble=%+v view=%q", bubble, bubble.View().Content)
 	}
 	updated, _ = bubble.Update(struct{}{})
 	if updated.(BubbleModel).LastAction != bubble.LastAction {
@@ -420,4 +449,121 @@ func TestBubbleModelAdapter(t *testing.T) {
 	if key := bubbleKey("tab"); key != KeyTab {
 		t.Fatalf("bubbleKey(tab) = %q", key)
 	}
+}
+
+func TestBubbleTeaV2StyledViewFieldsAndPaste(t *testing.T) {
+	bubble := NewBubble(commands.Environment{})
+	bubble.State.Composer = "/m"
+	view := bubble.View()
+	if !view.AltScreen || view.MouseMode != tea.MouseModeCellMotion || !view.ReportFocus || view.WindowTitle != "RecompHamr" {
+		t.Fatalf("view fields not set for Bubble Tea v2: %+v", view)
+	}
+	if view.Cursor == nil || view.Cursor.Shape != tea.CursorBar || !view.Cursor.Blink {
+		t.Fatalf("cursor not configured: %+v", view.Cursor)
+	}
+	if view.Cursor.X <= 0 || view.Cursor.Y <= 0 {
+		t.Fatalf("startup cursor should land in launcher composer, got %+v", view.Cursor)
+	}
+	if !strings.Contains(view.Content, "\x1b[") || !strings.Contains(view.Content, "COMMAND PALETTE") {
+		t.Fatalf("styled content missing ANSI or palette:\n%q", view.Content)
+	}
+	updated, _ := bubble.Update(tea.PasteMsg{Content: "line one\nline two"})
+	bubble = updated.(BubbleModel)
+	if len(bubble.State.Attachments) != 1 || !strings.Contains(bubble.State.Render(), "paste-1") {
+		t.Fatalf("paste message did not create chip: %+v", bubble.State)
+	}
+}
+
+func TestBubbleTeaStartupLayoutIsAnchored(t *testing.T) {
+	model := New(commands.Environment{})
+	model.Layout = Layout{Width: 120, Height: 32, Mode: "ready", ActiveModel: "lmstudio-amd", ActiveSkill: "none", MCPStatus: "manager wired", ContextStatus: "context=32768", PendingTool: "none", MemoryStatus: "fresh"}
+	view := model.RenderStyled()
+	plain := stripANSI(view)
+	if strings.HasPrefix(plain, "\n\n\n\n\n\n\n") {
+		t.Fatalf("startup layout has excessive top drift:\n%q", plain[:80])
+	}
+	for _, want := range []string{"RECOMP HAMR", "Ask RecompHamr", "Build * lmstudio-amd * ready"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("startup layout missing %q:\n%s", want, plain)
+		}
+	}
+	bubble := BubbleModel{State: model}
+	teaView := bubble.View()
+	if teaView.Cursor == nil || teaView.Cursor.Y != launcherTopPadding(model.Layout.Height)+4 {
+		t.Fatalf("startup cursor = %+v", teaView.Cursor)
+	}
+}
+
+func TestBubbleTeaRedesignedStyledChatStates(t *testing.T) {
+	model := New(commands.Environment{})
+	model.Transcript = []string{
+		"user: inspect",
+		"assistant: verified",
+		"tool: read_file ok",
+		"mcp ghidra connected",
+		"blocked: denied",
+		"unsupported: missing",
+		"unverified: evidence",
+	}
+	model.Composer = "/"
+	model.Status = "streaming"
+	view := model.RenderStyledWithLayout(Layout{Width: 100, Height: 28, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "wired", ContextStatus: "32k", PendingTool: "agent", MemoryStatus: "fresh"})
+	for _, want := range []string{"COMMAND PALETTE", "assistant: verified", "tool: read_file ok", "blocked: denied", "unsupported: missing", "status: streaming"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("styled chat missing %q:\n%s", want, view)
+		}
+	}
+	if !strings.Contains(view, "\x1b[") {
+		t.Fatalf("styled chat missing ANSI:\n%q", view)
+	}
+	empty := transcriptBubble(New(commands.Environment{}), 60, 4)
+	if !strings.Contains(empty, "No transcript yet") {
+		t.Fatalf("empty transcript bubble = %q", empty)
+	}
+	if got := transcriptCard("user: "+strings.Repeat("x", 50), 20, true); len(got) != 20 {
+		t.Fatalf("compact transcriptCard length=%d text=%q", len(got), got)
+	}
+	model.Composer = "/m"
+	if small := paletteBubble(model, 36); !strings.Contains(small, "COMMAND PALETTE") {
+		t.Fatalf("small palette = %q", small)
+	}
+	if styledDefault := model.RenderStyledWithLayout(Layout{}); !strings.Contains(styledDefault, "COMMAND PALETTE") {
+		t.Fatalf("styled default layout missing palette:\n%s", styledDefault)
+	}
+	model.Composer = ""
+	tiny := model.RenderStyledWithLayout(Layout{Width: 72, Height: 4, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "wired", ContextStatus: "32k", PendingTool: "agent", MemoryStatus: "fresh"})
+	if !strings.Contains(tiny, "assistant: verified") || !strings.Contains(tiny, "Build * local") {
+		t.Fatalf("tiny styled chat missing content:\n%s", tiny)
+	}
+	if got := renderWidth(0); got != 110 {
+		t.Fatalf("renderWidth zero = %d", got)
+	}
+}
+
+func keyText(text string) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Text: text, Code: []rune(text)[0]})
+}
+
+func keyCode(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code})
+}
+
+func stripANSI(text string) string {
+	var b strings.Builder
+	inEscape := false
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+		if inEscape {
+			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
+				inEscape = false
+			}
+			continue
+		}
+		if ch == 0x1b {
+			inEscape = true
+			continue
+		}
+		b.WriteByte(ch)
+	}
+	return b.String()
 }

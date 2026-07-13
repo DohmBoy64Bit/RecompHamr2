@@ -623,3 +623,78 @@ config/help/docs coverage plan, security analysis, and `make verify`.
 Verification commands: `make verify`; docs coverage check; architecture review.
 Stop condition: blocked if an extension lacks approved intake evidence or would
 violate separation of concerns.
+
+## Final TUI Polish Goal
+
+Outcome: the live end-user terminal app has a polished, feature-complete,
+text-stable TUI while preserving strict separation of concerns.
+Scope: pure `internal/tui` rendering, framed brand header, workbench/status
+band, transcript/evidence deck, command center, registry-backed command
+palette, compact startup, transcript labels, multiline composer, paste chips,
+Bubble Tea v2 `tea.View` rendering, Lip Gloss styling, declarative view fields,
+bracketed paste events, tests, user docs, architecture docs, parity,
+traceability, and status rows.
+Out of scope: copying OpenCode or RecompHamr 1.x 1:1, adding fake metrics,
+changing model/tool/MCP semantics, adding a desktop UI, or implementing
+post-parity runtime extensions.
+Evidence required: mandatory memory refresh, docs hash comparison, targeted TUI
+and app coverage, Bubble Tea v2 documentation review, docs updates, and full
+verification.
+Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
+verify`.
+Stop condition: blocked if polish requires unverified runtime data, copied
+third-party UI, package-boundary violations, or coverage/doc drift.
+
+## Ground-Up Bubble Tea TUI Redesign Goal
+
+Outcome: the RecompHamr TUI is redesigned around a real Bubble Tea v2 terminal
+experience rather than a debug-board layout.
+Scope: centered launcher, transcript-first chat, floating slash palette,
+bottom composer/status panel, compact rendering, RecompHamr-owned color roles,
+Bubble Tea v2 `tea.View` usage, Lip Gloss composition, tests, docs, parity,
+traceability, and status evidence.
+Out of scope: copying OpenCode or RecompHamr 1.x 1:1, changing agent/tool/MCP
+semantics, adding fake metrics, adding desktop UI, or bypassing separation of
+concerns.
+Evidence required: mandatory memory refresh, Bubble Tea v2 docs review,
+user screenshot reference as inspiration only, docs hash comparison, 100%
+statement coverage for touched packages, docs updates, and full verification.
+Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
+verify`; `go run ./cmd/recomphamr --summary`.
+Stop condition: blocked if the redesign requires unverified runtime state,
+third-party UI copying, package-boundary violations, or undocumented behavior.
+
+## TUI Startup Launcher Regression Goal
+
+Outcome: bare runtime composition preserves the centered Bubble Tea launcher
+until the user submits a prompt, slash command, paste chip, or runtime result.
+Scope: `internal/app` startup composition, app-level regression tests, TUI
+launch status docs, parity memory, traceability memory, and verification
+evidence.
+Out of scope: palette redesign, color changes, model backend behavior, tool
+behavior, MCP behavior, or moving render ownership out of `internal/tui`.
+Evidence required: source evidence that startup no longer seeds transcript
+lines, test evidence that launcher content renders without the internal runtime
+note, docs/status evidence, and no new security-sensitive side effects.
+Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
+verify`; `go run ./cmd/recomphamr --summary`.
+Stop condition: blocked if launcher rendering cannot be preserved without
+moving agent, command, tool, MCP, or config ownership into `internal/tui`.
+
+## TUI Startup Layout Correction Goal
+
+Outcome: the Bubble Tea startup launcher has intentional placement, an aligned
+composer/status panel, and a cursor that lands inside the composer instead of
+floating above the logo.
+Scope: `internal/tui` styled launcher layout, Bubble Tea `tea.View` cursor
+coordinates, responsive launcher helper tests, parity/status/traceability
+memory, and verification evidence.
+Out of scope: new commands, model behavior, tool behavior, MCP behavior, color
+scheme expansion, desktop UI, or copying OpenCode layout 1:1.
+Evidence required: screenshot-derived defect, source fix in the TUI boundary,
+tests for anchored startup layout and cursor placement, docs/status evidence,
+and no new security-sensitive side effects.
+Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
+verify`; `go run ./cmd/recomphamr --summary`.
+Stop condition: blocked if cursor placement cannot be corrected through Bubble
+Tea v2 declarative view fields and TUI-owned layout helpers.

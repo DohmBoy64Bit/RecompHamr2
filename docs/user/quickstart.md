@@ -12,6 +12,14 @@ environment, creates an MCP manager without autoconnecting servers, and prepares
 the Bubble Tea interface. From the TUI, type slash commands such as `/help` or
 submit a prompt to the configured OpenAI-compatible backend.
 
+The redesigned TUI opens on a centered launcher with `RECOMP HAMR`, the domain
+line, a prompt panel, active model/mode/status details, key hints, and a setup
+tip. After a prompt or command, the screen becomes transcript-first with a
+bottom composer/status panel. Typing `/` opens a floating registry-backed
+command palette. The live app runs through Bubble Tea v2 with declarative view
+fields for alt screen, mouse mode, focus reporting, title, and cursor, plus Lip
+Gloss styling for the visible terminal shell.
+
 Composer keys:
 
 - `/` opens the slash command palette.
@@ -19,6 +27,7 @@ Composer keys:
 - `Up` and `Down` navigate prompt history.
 - `Ctrl+C` cancels active work or arms quit while idle.
 - `Ctrl+D` exits.
+- `Esc` clears transient quit/status state.
 
 Deterministic startup evidence remains available without launching the TUI:
 

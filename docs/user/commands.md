@@ -27,7 +27,10 @@ environment. Slash commands dispatch in the TUI without calling the model.
 
 In the TUI, typing `/` opens the registry-backed command palette. `Tab`
 completes the first matching command, and palette rows show the command summary
-and usage from `internal/commands.Registry`.
+and usage from `internal/commands.Registry`. The palette appears under the
+`COMMAND PALETTE` section and never invents commands outside the registry.
+Status output and key hints remain in `COMMAND CENTER`; multiline prompts and
+large paste chips remain in `COMPOSER`.
 
 ## Slash Command Reference
 

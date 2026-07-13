@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"recomphamr2/internal/agent"
 	"recomphamr2/internal/config"
@@ -242,8 +242,37 @@ func TestComposeRuntimeLoadsMemory(t *testing.T) {
 	if runtime.TUI.Layout.Mode != "ready" || runtime.TUI.Layout.ActiveModel != runtime.Config.Active {
 		t.Fatalf("TUI layout = %#v", runtime.TUI.Layout)
 	}
-	if got := runtime.TUI.Submit("/models").Transcript[1]; !strings.Contains(got, "* lmstudio-amd") {
+	if len(runtime.TUI.Transcript) != 0 {
+		t.Fatalf("startup transcript = %#v, want empty launcher state", runtime.TUI.Transcript)
+	}
+	if got := runtime.TUI.Submit("/models").Transcript[0]; !strings.Contains(got, "* lmstudio-amd") {
 		t.Fatalf("runtime command dispatch = %q", got)
+	}
+}
+
+func TestComposeRuntimeStartsOnLauncher(t *testing.T) {
+	runtime, err := ComposeRuntime(Options{ProjectDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("ComposeRuntime() error = %v", err)
+	}
+	view := runtime.TUI.RenderStyledWithLayout(tui.Layout{
+		Width:         120,
+		Height:        32,
+		Mode:          runtime.TUI.Layout.Mode,
+		ActiveModel:   runtime.TUI.Layout.ActiveModel,
+		ActiveSkill:   runtime.TUI.Layout.ActiveSkill,
+		MCPStatus:     runtime.TUI.Layout.MCPStatus,
+		ContextStatus: runtime.TUI.Layout.ContextStatus,
+		PendingTool:   runtime.TUI.Layout.PendingTool,
+		MemoryStatus:  runtime.TUI.Layout.MemoryStatus,
+	})
+	for _, want := range []string{"RECOMP HAMR", "Ask RecompHamr", "Build * lmstudio-amd * ready"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("startup launcher missing %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "runtime: local product shell composed") || strings.Contains(view, "note        runtime:") {
+		t.Fatalf("startup launcher leaked runtime transcript note:\n%s", view)
 	}
 }
 
@@ -402,16 +431,16 @@ func TestLiveModelSlashPromptCancelAndQuit(t *testing.T) {
 		model:       &scriptModel{t: t, replies: []llm.Message{{Role: "assistant", Content: "assistant ready"}}},
 		tools:       func(context.Context, llm.ToolCall) (string, error) { return "", nil },
 	}
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/models")})
+	updated, cmd := model.Update(keyText("/models"))
 	model = updated.(liveModel)
-	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd = model.Update(keyCode(tea.KeyEnter))
 	model = updated.(liveModel)
-	if cmd != nil || !strings.Contains(model.View(), "models:") {
-		t.Fatalf("slash update cmd=%v view=\n%s", cmd, model.View())
+	if cmd != nil || !strings.Contains(model.View().Content, "models:") {
+		t.Fatalf("slash update cmd=%v view=\n%s", cmd, model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("hello")})
+	updated, _ = model.Update(keyText("hello"))
 	model = updated.(liveModel)
-	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd = model.Update(keyCode(tea.KeyEnter))
 	model = updated.(liveModel)
 	if cmd == nil || model.BubbleModel.State.Layout.Mode != "thinking" {
 		t.Fatalf("prompt update cmd=%v mode=%q", cmd, model.BubbleModel.State.Layout.Mode)
@@ -419,12 +448,12 @@ func TestLiveModelSlashPromptCancelAndQuit(t *testing.T) {
 	result := cmd().(agentResult)
 	updated, _ = model.Update(result)
 	model = updated.(liveModel)
-	if !strings.Contains(model.View(), "assistant: assistant ready") {
-		t.Fatalf("agent result view=\n%s", model.View())
+	if !strings.Contains(model.View().Content, "assistant: assistant ready") {
+		t.Fatalf("agent result view=\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	updated, _ = model.Update(keyCtrl('c'))
 	model = updated.(liveModel)
-	updated, cmd = model.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	updated, cmd = model.Update(keyCtrl('c'))
 	model = updated.(liveModel)
 	if cmd == nil || model.BubbleModel.State.Status != "quit" {
 		t.Fatalf("quit cmd=%v status=%q", cmd, model.BubbleModel.State.Status)
@@ -451,9 +480,9 @@ func TestLiveModelExposesMCPToolsForActiveSkill(t *testing.T) {
 		model:       model,
 		tools:       liveToolRunner(runtime),
 	}
-	updated, _ := live.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("use mcp")})
+	updated, _ := live.Update(keyText("use mcp"))
 	live = updated.(liveModel)
-	updated, cmd := live.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := live.Update(keyCode(tea.KeyEnter))
 	live = updated.(liveModel)
 	result := cmd().(agentResult)
 	if result.err != nil {
@@ -479,8 +508,8 @@ func TestLiveModelInitAndBlockedResult(t *testing.T) {
 	}
 	updated, _ := model.Update(agentResult{err: errors.New("backend failed")})
 	model = updated.(liveModel)
-	if model.BubbleModel.State.Status != "blocked" || !strings.Contains(model.View(), "blocked: backend failed") {
-		t.Fatalf("blocked result status=%q view=\n%s", model.BubbleModel.State.Status, model.View())
+	if model.BubbleModel.State.Status != "blocked" || !strings.Contains(model.View().Content, "blocked: backend failed") {
+		t.Fatalf("blocked result status=%q view=\n%s", model.BubbleModel.State.Status, model.View().Content)
 	}
 }
 
@@ -499,11 +528,11 @@ func TestLiveModelCancellationCancelsAgentContext(t *testing.T) {
 		}),
 		tools: func(context.Context, llm.ToolCall) (string, error) { return "", nil },
 	}
-	updated, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("cancel")})
+	updated, _ := model.Update(keyText("cancel"))
 	model = updated.(liveModel)
-	updated, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := model.Update(keyCode(tea.KeyEnter))
 	model = updated.(liveModel)
-	updated, _ = model.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	updated, _ = model.Update(keyCtrl('c'))
 	model = updated.(liveModel)
 	close(block)
 	result := cmd().(agentResult)
@@ -931,8 +960,20 @@ func (quitTeaModel) Update(tea.Msg) (tea.Model, tea.Cmd) {
 	return quitTeaModel{}, tea.Quit
 }
 
-func (quitTeaModel) View() string {
-	return ""
+func (quitTeaModel) View() tea.View {
+	return tea.NewView("")
+}
+
+func keyText(text string) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Text: text, Code: []rune(text)[0]})
+}
+
+func keyCode(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code})
+}
+
+func keyCtrl(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModCtrl})
 }
 
 func (m *scriptModel) Next(_ context.Context, messages []llm.Message) (llm.Message, error) {
