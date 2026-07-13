@@ -1112,3 +1112,24 @@ Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
 verify`; executable summary and diagnostic smoke; bare launch in WezTerm.
 Stop condition: blocked if a legitimate focus transition can still dereference
 an absent component cursor or if the rebuilt executable fails canonical gates.
+
+## Phase 63: Repository Lineage And Freeze
+
+Outcome: RecompHamr2 is preserved as the immutable feature-reference baseline,
+the original RecompHamr history is preserved as `RecompHamr-Legacy`, and the
+new RecompHamr repository is an attributed fork of CodeHamr at pinned upstream
+commit `85409d167b97bec64ee330d51872d358d3ce2d57`.
+Scope: local and remote commit verification, annotated reference tag, GitHub
+repository rename/archive/fork operations, MIT attribution, provenance evidence,
+documentation hashes, status memory, and remote verification.
+Out of scope: upstream source deletion, rebranding, dependency changes, TUI
+changes, feature ports, or claims that the upstream baseline already passes the
+RecompHamr verification gates.
+Evidence required: matching local/remote RecompHamr2 heads, pushed annotated
+tag, GitHub repository metadata, pinned upstream SHA, retained MIT license,
+provenance record, pre/post documentation hashes, and clean repository status.
+Verification commands: `git status --short --branch`; `git rev-parse HEAD`;
+`git ls-remote`; `gh repo view`; `gh api`; `make docscheck`; `make verify`.
+Stop condition: stop before a destructive or ambiguous repository operation if
+the target owner/name, authentication, source SHA, or recoverable remote history
+cannot be verified.

@@ -2,6 +2,12 @@
 
 ## Foundation Status
 
+- Phase 63 repository transition started: local and remote RecompHamr2 heads are
+  verified at `20727e5ebf4fb8492abd5dee77d70f3c020f1970`; CodeHamr upstream is
+  pinned at `85409d167b97bec64ee330d51872d358d3ce2d57`. GitHub rename, archive,
+  fork, tag, and final remote evidence remain pending until the documented
+  lineage operations complete.
+
 - Phase 0: complete for source inventory using `https://github.com/DohmBoy64Bit/RecompHamr` at commit `259a450e93af48437ee23663e5ca66cdc1ab8569`.
 - Phase 1: durable governance docs created.
 - Phase 1 hardening: separation-of-concerns rules are documented and enforced by `make archcheck`.
