@@ -330,19 +330,28 @@ func (m liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if bubble, ok := updated.(tui.BubbleModel); ok {
 			m.BubbleModel = bubble
 		}
-		switch m.BubbleModel.LastAction {
-		case tui.ActionSubmit:
+		switch m.BubbleModel.LastIntent.Kind {
+		case tui.IntentSubmit:
 			if submitted == "" || strings.HasPrefix(submitted, "/") {
 				return m, cmd
 			}
 			return m.startAgentTurn(submitted)
-		case tui.ActionCancel:
+		case tui.IntentCancel:
 			if m.cancel != nil {
 				m.cancel()
 				m.cancel = nil
 			}
 			return m, cmd
-		case tui.ActionQuit:
+		case tui.IntentModel:
+			m.BubbleModel.State = m.BubbleModel.State.Submit("/models " + m.BubbleModel.LastIntent.Value)
+			return m, cmd
+		case tui.IntentSkill:
+			m.BubbleModel.State = m.BubbleModel.State.Submit("/skill " + m.BubbleModel.LastIntent.Value)
+			return m, cmd
+		case tui.IntentMCP:
+			m.BubbleModel.State = m.BubbleModel.State.Submit("/mcp tools " + m.BubbleModel.LastIntent.Value)
+			return m, cmd
+		case tui.IntentQuit:
 			return m, tea.Quit
 		default:
 			return m, cmd
@@ -568,11 +577,11 @@ func (m liveModel) applyAgentResult(result agentResult) liveModel {
 			m.BubbleModel.State.Status = "cancelled"
 		} else {
 			m.BubbleModel.State.Status = "blocked"
-			m.BubbleModel.State.Transcript = append(m.BubbleModel.State.Transcript, "blocked: "+result.err.Error())
+			m.BubbleModel.State = m.BubbleModel.State.AppendRuntimeTranscript("blocked: " + result.err.Error())
 		}
 	}
 	m.history = result.messages
-	m.BubbleModel.State.Transcript = append(m.BubbleModel.State.Transcript, visibleAgentLines(result.messages, result.visibleOffset)...)
+	m.BubbleModel.State = m.BubbleModel.State.AppendRuntimeTranscript(visibleAgentLines(result.messages, result.visibleOffset)...)
 	return m
 }
 

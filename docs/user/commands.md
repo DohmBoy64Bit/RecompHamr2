@@ -25,12 +25,23 @@ recomphamr --diagnostic
 The slash command registry is implemented and wired into the live runtime
 environment. Slash commands dispatch in the TUI without calling the model.
 
-In the TUI, typing `/` opens the registry-backed command palette. `Tab`
-completes the first matching command, and palette rows show the command summary
-and usage from `internal/commands.Registry`. The palette appears under the
-`COMMAND PALETTE` section and never invents commands outside the registry.
-Status output and key hints remain in `COMMAND CENTER`; multiline prompts and
-large paste chips remain in `COMPOSER`.
+In the TUI, typing `/` opens the registry-backed command palette. `Up`, `Down`,
+`j`, and `k` move the selected row. `Tab` completes the selected command. Rows
+show name and summary; one footer shows selected usage and side effects from
+`internal/commands.Registry`. Exact `/models`, `/skills`, `/skill`, `/mcp`, and
+`/help` composer text opens read-only overlays for model profiles, skill state,
+MCP state, and implemented key help. These overlays render local snapshots only:
+the TUI does not mutate config, activate skills, connect MCP servers, or spawn
+processes until the user submits a documented command.
+
+Composer input uses `Shift+Enter` or `Ctrl+J` for a newline and `Enter` to
+submit. In chat, `Page Up`, `Page Down`, and the optional mouse wheel scroll the
+transcript. Terminals below 60 columns by 18 rows show a resize requirement;
+`Ctrl+D` remains available to exit.
+
+While scrolled up, new transcript entries preserve the view and display `new
+output  PgDn to follow`. Tool and MCP output is bounded to 12 rendered lines
+and states `output truncated` when additional lines are hidden.
 
 ## Slash Command Reference
 

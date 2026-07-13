@@ -1,0 +1,8 @@
+blocked     blocked: MCP server is not connected
+unsupported unsupported: remote cost metrics are unavailable
+unverified  unverified: context header missing
+status      status: blocked: waiting for explicit user action
+
+Ask RecompHamr... "map this function"
+Build * lmstudio-amd * ready * memory fresh * skill ghidra-mcp * mcp manager wired * context context=32768
+/ commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit

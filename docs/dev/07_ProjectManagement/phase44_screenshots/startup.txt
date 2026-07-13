@@ -1,0 +1,8 @@
+                                                 RECOMP HAMR
+                            RE . decomp . recomp . evidence-backed reconstruction
+
+                                    Ask RecompHamr... "map this function"
+  Build * lmstudio-amd * ready * memory fresh * skill ghidra-mcp * mcp manager wired * context context=32768
+                         / commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit
+
+                                Tip: keep evidence in .rehamr/REPHAMR_STATE.md

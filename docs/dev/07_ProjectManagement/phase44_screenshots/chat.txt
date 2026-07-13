@@ -1,0 +1,10 @@
+user        user: map this function
+assistant   assistant: gathering local evidence
+tool        tool: powershell completed
+mcp         mcp: ghidra.decompile returned
+verification verification: local checks passed
+status      status: status: streaming verification
+
+Ask RecompHamr... "map this function"
+Build * lmstudio-amd * ready * memory fresh * skill ghidra-mcp * mcp manager wired * context context=32768
+/ commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit

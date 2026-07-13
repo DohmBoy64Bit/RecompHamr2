@@ -1,0 +1,17 @@
+                                                 RECOMP HAMR
+                            RE . decomp . recomp . evidence-backed reconstruction
+
+                                               composer > /mcp
+  Build * lmstudio-amd * ready * memory fresh * skill ghidra-mcp * mcp manager wired * context context=32768
+                         / commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit
+
+                                Tip: keep evidence in .rehamr/REPHAMR_STATE.md
+                                                 Mcp Controls
+                         ghidra             disconnected  stdio ghidra-mcp skill-gated
+                        n64-debug-mcp      disconnected  stdio n64-debug-mcp skill-gated
+                        pcrecomp           disconnected  stdio pcrecomp-mcp skill-gated
+                          mcp-pine           disconnected  stdio mcp-pine skill-gated
+                         objdiff            disconnected  stdio objdiff-mcp skill-gated
+                          pcsx2              disconnected  stdio pcsx2-mcp skill-gated
+                         bizhawk            disconnected  stdio bizhawk-mcp skill-gated
+                        sega2asm           disconnected  stdio sega2asm-mcp skill-gated

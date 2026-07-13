@@ -1,0 +1,20 @@
+                                                 RECOMP HAMR
+                            RE . decomp . recomp . evidence-backed reconstruction
+
+                                                 composer > /
+  Build * lmstudio-amd * ready * memory fresh * skill ghidra-mcp * mcp manager wired * context context=32768
+                         / commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit
+
+                                Tip: keep evidence in .rehamr/REPHAMR_STATE.md
+                                               Command Palette
+                        > /clear         reset the visible conversation  usage: /clear
+                      /models        list or switch model profiles  usage: /models [name]
+                         /skills        list embedded and custom skills  usage: /skills
+                           /skill         load a skill by name  usage: /skill <name>
+                      /skill-audit   classify a skill template  usage: /skill-audit <name>
+                     /skill-new     fetch and classify a new skill  usage: /skill-new <url>
+                          /init-re       create `.rehamr/` workspace  usage: /init-re
+                            /status-re     summarize RE workspace  usage: /status-re
+                              /doctor        run local diagnostics  usage: /doctor
+  /mcp           show or manage MCP servers  usage: /mcp [connect|disconnect|tools|enable|disable] <server> [tool]
+                            /help          show command help  usage: /help [command]

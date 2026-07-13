@@ -1,5 +1,20 @@
 # Configuration
 
+## Terminal Color
+
+RecompHamr follows the terminal color capability reported by Bubble Tea. To
+disable color for accessibility, logs, or terminal compatibility, define the
+standard `NO_COLOR` environment variable before launch:
+
+```powershell
+$env:NO_COLOR = "1"
+.\recomphamr.exe
+```
+
+Any defined value enables no-color mode. Remove it with
+`Remove-Item Env:NO_COLOR` before launching to restore automatic ANSI16,
+ANSI256, or truecolor selection. No project configuration file is required.
+
 Configuration is stored in `.rehamr/config.yaml`. Phase 3 supports secure
 creation, strict loading, model profile selection, and process-local URL
 overrides.

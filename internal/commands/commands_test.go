@@ -39,6 +39,80 @@ func TestRegistryAndHelp(t *testing.T) {
 	}
 }
 
+func TestPickerRows(t *testing.T) {
+	if rows := ModelPickerRows(Environment{}); len(rows) != 1 || !rows[0].Blocked || !strings.Contains(rows[0].Summary, "config") {
+		t.Fatalf("blocked model rows = %+v", rows)
+	}
+	cfg := config.Default()
+	profile := cfg.Models[cfg.Active]
+	profile.URL = "http://localhost:1234/v1?api_key=secret"
+	cfg.Models[cfg.Active] = profile
+	cfg.Models["empty-url"] = config.Profile{LLM: "empty", URL: "", ContextSize: 1024}
+	cfg.Models["long-url"] = config.Profile{LLM: "long", URL: "http://localhost:1234/this/path/is/long/enough/to/truncate/value", ContextSize: 2048}
+	modelRows := ModelPickerRows(Environment{Config: cfg})
+	if len(modelRows) < 3 || !strings.Contains(modelRows[0].Detail, "url unverified") {
+		t.Fatalf("model rows = %+v", modelRows)
+	}
+	var activeFound, queryRedacted, truncated bool
+	for _, row := range modelRows {
+		activeFound = activeFound || row.Active
+		queryRedacted = queryRedacted || (row.Name == cfg.Active && !strings.Contains(row.Detail, "api_key"))
+		truncated = truncated || strings.Contains(row.Detail, "...")
+	}
+	if !activeFound || !queryRedacted || !truncated {
+		t.Fatalf("model row evidence active=%v queryRedacted=%v truncated=%v rows=%+v", activeFound, queryRedacted, truncated, modelRows)
+	}
+
+	if rows := SkillPickerRows(Environment{CustomSkillsDir: string(rune(0))}); len(rows) == 0 || !rows[len(rows)-1].Blocked {
+		t.Fatalf("skill rows missing blocked custom row: %+v", rows)
+	}
+	customDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(customDir, "custom.md"), []byte("# Custom\nUse this skill when custom work is needed.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	skillRows := SkillPickerRows(Environment{CustomSkillsDir: customDir, ActiveSkills: []string{"custom"}})
+	var customActive bool
+	for _, row := range skillRows {
+		customActive = customActive || row.Name == "custom" && row.Active && strings.Contains(row.Detail, "custom")
+	}
+	if !customActive {
+		t.Fatalf("custom active skill row missing: %+v", skillRows)
+	}
+
+	t.Setenv("RECOMPHAMR_MCP_GHIDRA_URL", "http://localhost:1234/mcp?token=secret")
+	t.Setenv("RECOMPHAMR_MCP_AUTOSTART", "1")
+	builtinMCP := MCPPickerRows(Environment{})
+	if len(builtinMCP) == 0 || !strings.Contains(builtinMCP[0].Summary, "disconnected") {
+		t.Fatalf("builtin MCP rows = %+v", builtinMCP)
+	}
+	var ghidraHTTP bool
+	for _, row := range builtinMCP {
+		ghidraHTTP = ghidraHTTP || row.Name == "ghidra" && strings.Contains(row.Detail, "http") && !strings.Contains(row.Detail, "token")
+	}
+	if !ghidraHTTP {
+		t.Fatalf("ghidra HTTP MCP row missing: %+v", builtinMCP)
+	}
+
+	manager := mcp.NewManager([]mcp.ServerConfig{{Name: "ok"}}, mcp.ConnectorFunc(func(context.Context, mcp.ServerConfig) (mcp.Client, error) {
+		return &commandFakeMCPClient{tools: []mcp.ToolDef{{Name: "decompile"}}}, nil
+	}))
+	if err := manager.Connect(context.Background(), "ok"); err != nil {
+		t.Fatal(err)
+	}
+	managerRows := MCPPickerRows(Environment{MCP: manager})
+	if len(managerRows) != 1 || !managerRows[0].Active || !strings.Contains(managerRows[0].Detail, "tools 1") {
+		t.Fatalf("manager MCP rows = %+v", managerRows)
+	}
+	errManager := mcp.NewManager([]mcp.ServerConfig{{Name: "bad"}}, mcp.ConnectorFunc(func(context.Context, mcp.ServerConfig) (mcp.Client, error) {
+		return nil, errors.New("boom")
+	}))
+	_ = errManager.Connect(context.Background(), "bad")
+	errorRows := MCPPickerRows(Environment{MCP: errManager})
+	if len(errorRows) != 1 || !errorRows[0].Blocked || !strings.Contains(errorRows[0].Detail, "boom") {
+		t.Fatalf("error MCP rows = %+v", errorRows)
+	}
+}
+
 func TestExecuteCommands(t *testing.T) {
 	cfg, _, err := config.Bootstrap(t.TempDir())
 	if err != nil {

@@ -167,3 +167,17 @@ Phase 12 release checksum contract:
 - Later installer, updater, and release-automation packages may call
   `internal/release` after they independently document and test their own
   security boundaries.
+
+Phase 36 extension architecture contract:
+
+- `ExtensionArchitecture.md` is planning-only and does not implement runtime
+  extension behavior.
+- Future extension packages must preserve the existing dependency direction:
+  `internal/app` wires side effects, `internal/agent` consumes interfaces,
+  `internal/tui` renders snapshots, and owning packages keep their current
+  domains.
+- Every extension with configuration must document file paths, keys, defaults,
+  validation, examples, help text, and security rules before implementation.
+- Subprocess helpers, optional Rust binaries, external analyzers, and plugin
+  tools remain unsupported until a later goal adds protocol docs, bounded IO,
+  cancellation, tests, packaging, and security review.

@@ -1,0 +1,9 @@
+user user: map function
+assistant assistant: evidence found
+tool tool: powershell verified
+mcp mcp: ghidra connected
+verification verification: hashes match
+warning warning: inspect relocation
+blocked blocked: permission denied
+unsupported unsupported: provider metric
+attachment paste: paste-1 (20 bytes)

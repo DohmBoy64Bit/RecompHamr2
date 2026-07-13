@@ -19,6 +19,11 @@ RecompHamr packages must stay small, directional, and independently testable. Fe
 - `internal/project` may depend on `internal/config` for workspace bootstrap.
 - `internal/logging` may depend on `internal/security` for redaction and must not own runtime policy.
 - `internal/release` owns local manifest and checksum verification only; it must not download artifacts, run installers, update binaries, read project config, or own command parsing.
+- Future extension packages are unsupported until an approved goal adds source,
+  docs, tests, and archcheck rules. They must follow
+  `ExtensionArchitecture.md`: app wiring owns side effects, agent code consumes
+  interfaces, TUI renders snapshots only, and domain packages keep ownership of
+  config, tools, MCP, release, security, and project state.
 - Core packages such as `config`, `llm`, `mcp`, `parity`, `security`, `skills`, `testharness`, and `tools` must not import higher-level RecompHamr packages.
 
 ## Enforcement

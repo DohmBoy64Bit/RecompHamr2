@@ -44,7 +44,24 @@ Record both names in goal packets, traceability rows, and status reports.
 | 33 | TUI Transcript, Tool Blocks, And Runtime Feedback | Corrective TUI hardening | complete |
 | 34 | Windows Executable And End-User Launch Polish | Corrective packaging/runtime hardening | complete |
 | 35 | Post-Parity Feature Intake | Workflow Phase 15 | complete; Phase 36 approved as architecture-only planning |
-| 36 | Extension Architecture Planning | Workflow Phase 15 extension planning | approved next; implementation still blocked |
+| 36 | Extension Architecture Planning | Workflow Phase 15 extension planning | complete for architecture-only planning; implementation still blocked |
+| 37 | Corrective TUI Rewrite Governance Pin | User corrective TUI rewrite request | complete |
+| 38 | TUI Design Audit And Non-Copy Specification | Corrective TUI rewrite | complete |
+| 39 | TUI Architecture Reset | Corrective TUI rewrite | complete |
+| 40 | Bubble Tea Shell Rebuild | Corrective TUI rewrite | complete |
+| 41 | Startup And Composer Experience | Corrective TUI rewrite | complete |
+| 42 | Command Palette And Modals | Corrective TUI rewrite | complete |
+| 43 | Transcript And Runtime States | Corrective TUI rewrite | complete |
+| 44 | Screenshot Verification And Release Smoke | Corrective TUI rewrite | complete |
+| 45 | Governance And Evidence Baseline | Second corrective TUI rebuild | complete |
+| 46 | RecompHamr UX Specification | Second corrective TUI rebuild | complete |
+| 47 | TUI Architecture Replacement | Second corrective TUI rebuild | complete |
+| 48 | Bubble Tea Runtime And Input | Second corrective TUI rebuild | complete |
+| 49 | Minimal Startup Experience | Second corrective TUI rebuild | complete |
+| 50 | Command Palette And Pickers | Second corrective TUI rebuild | complete |
+| 51 | Transcript And Runtime Feedback | Second corrective TUI rebuild | complete |
+| 52 | Responsive, Theme, And Accessibility Pass | Second corrective TUI rebuild | complete |
+| 53 | End-User Acceptance And Release Evidence | Second corrective TUI rebuild | pending; next phase |
 
 ## Global Gates
 
@@ -291,6 +308,115 @@ analyzers, plugin-style tools, richer MCP integrations, and future UI surfaces.
 Phase 35 approves this as the next phase, but implementation remains blocked
 until each feature has its own approved goal packet.
 
+Phase 36 is complete for architecture-only planning after the corrective TUI
+rewrite track. `ExtensionArchitecture.md` records package boundaries, protocol
+and process contracts, configuration coverage rules, permission prompt design
+boundaries, session export/import boundaries, security rules, and test strategy.
+No runtime extension implementation is approved by Phase 36; every future
+extension still needs its own goal packet and intake update.
+
+### Phase 37 — Corrective TUI Rewrite Governance Pin
+
+Record the user-requested TUI rewrite as a corrective track before any new
+extension work. Preserve phases 0-36 as durable history, mark previous TUI
+polish rows as superseded by user screenshot evidence, and require every TUI
+task to refresh `AGENTS.md`, the workflow, Bubble Tea v2 docs, TUI architecture
+docs, parity rows, traceability rows, and latest status reports.
+
+Phase 37 closes when this roadmap, phase goals, TUI parity/spec docs,
+traceability, status reports, and docs index all describe phases 37-44 and
+state that Bubble Tea v2 documentation review is mandatory before every TUI
+implementation task.
+
+### Phase 38 — TUI Design Audit And Non-Copy Specification
+
+Audit the rejected current layout, current `internal/tui` behavior, required
+RecompHamr TUI parity, user screenshots, and optional temporary OpenCode
+reference checkout. Produce a RecompHamr-owned design spec for startup, chat,
+slash palette, model picker, skill picker, MCP state, tool transcript, blocked
+states, responsive breakpoints, color roles, spacing, and screenshot
+acceptance. OpenCode is inspiration only; no source, wording, colors, or exact
+layout may be copied.
+
+### Phase 39 — TUI Architecture Reset
+
+Split the TUI implementation into explicit internal concerns while preserving
+the app-facing contract unless a documented compatibility shim is added:
+state/update, Bubble Tea adapter, layout engine, theme, composer, palette,
+modals, transcript, status/footer, fixtures, and render tests. The TUI remains
+side-effect free; `internal/app` continues to own agent, tool, MCP, config, and
+runtime side effects.
+
+### Phase 40 — Bubble Tea Shell Rebuild
+
+Rebuild the live terminal shell around Bubble Tea v2's model/update/view
+contract. `View()` returns `tea.View`; key handling uses `tea.KeyPressMsg`;
+paste handling uses `tea.PasteMsg`; terminal behavior such as alt screen,
+mouse mode, focus reporting, title, and cursor is declared on `tea.View`; Lip
+Gloss v2 owns styling. Remove layout hacks that calculate a visual screen
+outside the Bubble Tea view contract.
+
+### Phase 41 — Startup And Composer Experience
+
+Implement the polished first-run surface: RecompHamr identity, domain line,
+concise safety note, centered composer, model/provider/skill/MCP/context
+status, hint line, memory setup tip, and responsive placement that remains
+balanced in Windows Terminal wide and compact sizes.
+
+### Phase 42 — Command Palette And Modals
+
+Implement feature-complete slash palette, model picker, skill picker, MCP
+controls, and help overlays. Rows must be registry/config/state backed, support
+keyboard navigation and filtering, document side effects, and show empty or
+blocked states without fake success paths.
+
+### Phase 43 — Transcript And Runtime States
+
+Implement transcript-first chat states for user, assistant, command, tool, MCP,
+blocked, unsupported, unverified, attachment, streaming, cancellation, and
+verification output. Metrics render only when locally verified; otherwise omit
+them or label them `unverified`.
+
+### Phase 44 — Screenshot Verification And Release Smoke
+
+Capture screenshot evidence for startup, palette, chat, compact layout,
+blocked state, and model/MCP modal. Build and smoke the Windows `.exe`, run
+`make verify`, update docs and traceability, and only then resume Phase 36 or
+later roadmap work.
+
+Phase 44 is complete locally. Deterministic render captures for startup,
+palette, chat, compact, blocked, model modal, and MCP modal states are stored
+under `docs/dev/07_ProjectManagement/phase44_screenshots/`, and the capture
+method plus executable smoke evidence are recorded in
+`docs/dev/07_ProjectManagement/Phase44TUIScreenshotEvidence.md`. A local
+`dist/recomphamr.exe` was built with `go build -trimpath`, `--summary` and
+`--diagnostic` ran successfully from that binary, and the executable SHA-256 is
+recorded in the evidence ledger.
+
+## Corrective TUI Rebuild Phases 45-53
+
+The user rejected the Phase 37-44 result after comparing the real startup and
+palette against the intended command-first experience. Phase 36 remains
+complete for architecture planning, but later roadmap implementation is paused
+while this second corrective track runs. Historical phases are preserved.
+
+| Phase | Goal | Status |
+|---|---|---|
+| 45 | Governance and evidence baseline | complete |
+| 46 | RecompHamr UX specification | complete |
+| 47 | TUI architecture replacement | complete |
+| 48 | Bubble Tea runtime and input | pending |
+| 49 | Minimal startup experience | pending |
+| 50 | Command palette and pickers | pending |
+| 51 | Transcript and runtime feedback | pending |
+| 52 | Responsive theme and accessibility | pending |
+| 53 | End-user acceptance and release evidence | pending |
+
+Each phase uses its own goal packet, reads current Bubble Tea v2 documentation
+and the complete local `tui-design` guidance before and after work, compares
+relevant documentation hashes, updates user/developer memory, and closes only
+after `make verify` reports 100% statement and documentation coverage.
+
 ## Public Interfaces And Types
 
 - MCP protocol/client/manager interfaces live under `internal/mcp` and must
@@ -316,10 +442,11 @@ until each feature has its own approved goal packet.
 ## Assumptions
 
 - "Next 20 phases" now means the reconciled forward plan from phases 10
-  through 36 after completed Phase 9; Phase 28 was inserted as a corrective
+  through 44 after completed Phase 9; Phase 28 was inserted as a corrective
   runtime integration phase, Phase 29 as corrective MCP agent integration,
   phases 30-34 as corrective TUI and Windows executable hardening, moving
-  feature intake to Phase 35 and extension planning to Phase 36.
+  feature intake to Phase 35, extension planning to Phase 36, and the user
+  requested full TUI rewrite to corrective phases 37-44.
 - Go remains the implementation language and `make verify` remains canonical.
 - Windows remains the primary target, with Linux/macOS validated where scripts
   and CI are available.

@@ -698,3 +698,275 @@ Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
 verify`; `go run ./cmd/recomphamr --summary`.
 Stop condition: blocked if cursor placement cannot be corrected through Bubble
 Tea v2 declarative view fields and TUI-owned layout helpers.
+
+## Phase 37: Corrective TUI Rewrite Governance Pin
+
+Outcome: the rejected TUI polish path is superseded by a durable corrective
+rewrite track while preserving the previous roadmap for later use.
+Scope: `Next20PhasePlan.md`, this goal packet file, TUI architecture/spec and
+parity docs, traceability, status reports, docs index, mandatory Bubble Tea v2
+documentation rule, and docs hash evidence.
+Out of scope: TUI rendering code, command semantics, model/tool/MCP behavior,
+new post-parity extensions, desktop UI, or copying OpenCode/RecompHamr 1.x
+1:1.
+Evidence required: mandatory memory refresh, Bubble Tea v2 docs review,
+before/after docs hash comparison, updated roadmap rows for phases 37-44,
+traceability/status rows, and no code behavior changes.
+Verification commands: `make docscheck`; `make verify`; docs hash comparison.
+Stop condition: blocked if the corrective track cannot be documented without
+deleting or renumbering the existing roadmap.
+
+## Phase 38: TUI Design Audit And Non-Copy Specification
+
+Outcome: a RecompHamr-owned TUI design spec exists before implementation.
+Scope: current TUI audit, rejected screenshot evidence, current `internal/tui`
+contract, RecompHamr TUI parity, OpenCode inspiration boundaries, screen-state
+inventory, visual tokens, breakpoints, key interaction matrix, and screenshot
+acceptance checklist.
+Out of scope: implementation edits, copied OpenCode source/style/copy, new
+features, desktop UI, or fake runtime metrics.
+Evidence required: source/docs references, screenshot-derived defect notes,
+non-copy design rationale, updated `TUISpec.md`, parity/status/traceability
+rows, and docs hash comparison.
+Verification commands: `make docscheck`; `make verify`.
+Stop condition: blocked if a design requirement cannot be tied to local code,
+project docs, user screenshots, parity requirements, or explicitly labeled
+inspiration.
+
+## Phase 39: TUI Architecture Reset
+
+Outcome: `internal/tui` is split into testable concerns without moving side
+effects into the TUI.
+Scope: pure model/update state, Bubble Tea adapter, layout engine, theme,
+composer, palette, modal overlays, transcript, status/footer, fixtures, tests,
+architecture docs, and exported Go doc comments.
+Out of scope: agent/tool/LLM/MCP/config semantics, new commands, fake metrics,
+OpenCode source copying, or unapproved public APIs.
+Evidence required: package-boundary review, archcheck evidence, 100% statement
+coverage for touched packages, docs/docstrings updates, and traceability rows.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make archcheck`; `make verify`.
+Stop condition: blocked if the split requires package-boundary violations or
+breaks the app-facing TUI contract without documented compatibility.
+
+## Phase 40: Bubble Tea Shell Rebuild
+
+Outcome: the live shell is rebuilt around Bubble Tea v2 model/update/view
+semantics rather than ad hoc terminal layout calculations.
+Scope: `tea.Model`, `tea.View`, `tea.KeyPressMsg`, `tea.PasteMsg`, declarative
+view fields, cursor ownership, resize handling, Lip Gloss styling, tests,
+Bubble Tea docs evidence, and user/dev docs.
+Out of scope: new runtime side effects, copied third-party UI, desktop UI, or
+unverified metrics.
+Evidence required: current Bubble Tea v2 docs review, source tests for view
+fields/key/paste/resize behavior, docs hash comparison, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked if a live behavior cannot be implemented through
+Bubble Tea v2's documented model/update/view contract.
+
+## Phase 41: Startup And Composer Experience
+
+Outcome: bare launch presents a polished, balanced RecompHamr startup and
+composer experience in wide and compact terminals.
+Scope: startup brand/domain/safety content, centered composer, status line,
+memory setup hint, key hints, responsive spacing, cursor placement, golden
+renders, screenshot evidence, user docs, and TUI parity rows.
+Out of scope: transcript redesign beyond startup needs, command modal work,
+model/tool/MCP semantics, fake metrics, or copied OpenCode layout.
+Evidence required: wide and compact golden renders, screenshot evidence,
+cursor tests, docs updates, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`; screenshot capture command or documented manual screenshot.
+Stop condition: blocked if startup layout cannot be screenshot-verified in the
+local Windows terminal environment.
+
+## Phase 42: Command Palette And Modals
+
+Outcome: slash commands, model profiles, skills, MCP controls, and help render
+as polished Bubble Tea overlays backed by real registries/config/state.
+Scope: palette filtering/navigation, selected row, usage and side-effect text,
+model picker, skill picker, MCP controls, help overlay, empty/blocked states,
+tests, user docs, and traceability.
+Out of scope: adding new command semantics, hidden config mutation, fake MCP
+success, copied OpenCode modal layout, or desktop UI.
+Evidence required: registry/config-backed tests, golden renders, key handling
+tests, docs/help updates, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/commands
+./internal/app -cover`; `make verify`.
+Stop condition: blocked if an overlay would require hard-coded fake rows or
+undocumented side effects.
+
+## Phase 43: Transcript And Runtime States
+
+Outcome: chat, tool, MCP, blocked, unsupported, unverified, streaming, cancel,
+and verification states render as professional transcript blocks.
+Scope: transcript renderer, runtime status footer, tool/MCP result cards,
+blocked/unsupported cards, redaction, attachment chips, streaming labels,
+golden renders, fake-runtime tests, user docs, and status/traceability rows.
+Out of scope: storing private reasoning, inventing token/cost/timing values,
+changing agent loop policy, copied OpenCode transcript design, or telemetry.
+Evidence required: fake-runtime tests, golden renders, redaction tests, docs
+hash comparison, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app ./internal/agent
+-cover`; `make verify`.
+Stop condition: blocked if transcript rendering requires unavailable metrics,
+private reasoning storage, unredacted secrets, or untestable terminal behavior.
+
+## Phase 44: Screenshot Verification And Release Smoke
+
+Outcome: the final rewritten TUI is screenshot-verified, documented, tested,
+and smoke-tested from the Windows `.exe` before the old roadmap resumes.
+Scope: screenshot evidence for startup, palette, chat, compact layout, blocked
+state, and model/MCP modal; `.exe` build; `--summary`; `--diagnostic`;
+docs/status/traceability/parity updates; docs index; final coverage evidence.
+Out of scope: new post-parity features, desktop UI, remote publication claims,
+or unsupported installer execution.
+Evidence required: screenshot paths or documented capture evidence, local
+binary path, checksum or build evidence, `make verify`, docs hash comparison,
+and explicit known limits if any.
+Verification commands: `make verify`; `go build -trimpath -o
+dist/recomphamr.exe ./cmd/recomphamr`; `dist/recomphamr.exe --summary`;
+`dist/recomphamr.exe --diagnostic`.
+Stop condition: blocked if screenshot evidence, `.exe` smoke, docs, coverage,
+or traceability cannot be completed locally.
+
+## Phase 45: Corrective TUI Governance And Evidence Baseline
+
+Outcome: phases 45-53 are pinned as the active corrective TUI track and the
+rejected Phase 37-44 visual result is preserved as historical evidence.
+Scope: roadmap memory, source/test/screenshot inventory, clutter and responsive
+gates, non-copying rules, docs hashes, status, traceability, and docs index.
+Out of scope: TUI source changes, dependency changes, or revised runtime
+behavior.
+Evidence required: supplied screenshots, local source inventory, current TUI
+tests, pre/post documentation hashes, and canonical verification.
+Verification commands: `make docscheck`; `make verify`.
+Stop condition: blocked if a baseline claim cannot be tied to source, a test,
+or an identified screenshot.
+
+## Phase 46: RecompHamr UX Specification
+
+Outcome: a decision-complete, original RecompHamr TUI specification defines
+every required screen, interaction, breakpoint, color role, and clutter limit.
+Scope: startup, chat, palette, model/skill/MCP/help pickers, runtime states,
+wide/medium/80x24/60-column/minimum layouts, accessibility, and non-copying
+comparison rules.
+Out of scope: code changes, speculative runtime data, or copied OpenCode source,
+wording, glyphs, colors, or exact composition.
+Evidence required: cell-based wireframes, interaction tables, source-backed
+state inventory, screenshot comparison, docs hashes, and docs verification.
+Verification commands: `make docscheck`; `make verify`.
+Stop condition: blocked if any required screen or interaction still requires an
+implementation-time design decision.
+
+## Phase 47: TUI Architecture Replacement
+
+Outcome: TUI internals use focused Bubble Tea/Bubbles components and typed
+intents while `internal/app` retains all side-effect ownership.
+Scope: textarea, viewport, key/help bindings, list mechanics, layout tree,
+semantic theme, typed intents, display-width measurement, render fixtures,
+architecture tests, and docs.
+Out of scope: new commands, new agent/tool/MCP semantics, copied third-party UI,
+or user-visible fake data.
+Evidence required: current Bubble Tea/Bubbles docs, source and architecture
+tests, exported docs, docs hashes, and 100% statement coverage.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make archcheck`; `make verify`.
+Stop condition: blocked if a TUI component must directly own config, agent,
+tool, MCP, filesystem, or network side effects.
+
+## Phase 48: Bubble Tea Runtime And Input
+
+Outcome: keyboard, paste, resize, focus, mouse-wheel, cursor, history,
+attachments, cancellation, quit, and minimum-size behavior are correct through
+Bubble Tea v2 messages and declarative views.
+Scope: message routing, component updates, terminal view fields, transcript
+scrolling, optional mouse behavior, and terminal-too-small handling.
+Out of scope: final visual polish, undocumented shortcuts, or blocking I/O in
+Update/View.
+Evidence required: message/update tests, resize and cursor tests, current
+Bubble Tea docs, runtime render evidence, docs hashes, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked if terminal behavior requires ad hoc output outside
+Bubble Tea's documented runtime contract.
+
+## Phase 49: Minimal Startup Experience
+
+Outcome: startup is an uncluttered command-first surface with an original
+two-tone RecompHamr wordmark, compact composer, concise status, limited hints,
+and conditional guidance.
+Scope: startup layout, responsive composer sizing, semantic theme, status
+priority, cursor placement, wide/80x24/60-column goldens, screenshots, and docs.
+Out of scope: transcript redesign, picker behavior, duplicated status prose, or
+unverified metrics.
+Evidence required: UX-spec checks, golden renders, live render captures,
+source tests, docs hashes, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked if startup clips, overlaps, duplicates state, or exceeds
+the documented clutter budget at a supported size.
+
+## Phase 50: Command Palette And Pickers
+
+Outcome: slash commands and model, skill, MCP, and help choices use complete,
+registry/state-backed keyboard-first palettes and modals.
+Scope: anchored filtering, bounded lists, selection, detail line, Enter/Tab/Esc,
+argument handling, typed intents, empty/blocked states, compact layouts, docs,
+and tests.
+Out of scope: hard-coded command rows, direct TUI side effects, fake provider or
+MCP state, or copied OpenCode modal composition.
+Evidence required: registry completeness, interaction and intent tests, golden
+renders, app integration tests, docs hashes, and 100% coverage.
+Verification commands: `go test ./internal/commands ./internal/tui
+./internal/app -cover`; `make verify`.
+Stop condition: blocked if any visible row or action cannot be derived from
+implemented command/runtime state.
+
+## Phase 51: Transcript And Runtime Feedback
+
+Outcome: append-only conversation, tool, MCP, verification, warning, blocked,
+unsupported, attachment, streaming, and cancellation states render clearly
+above a fixed command lane.
+Scope: viewport following/scrolling, semantic transcript blocks, bounded output,
+status feedback, redaction, fake-agent integration, goldens, and docs.
+Out of scope: private reasoning, fabricated token/cost/time metrics, or changes
+to agent/tool execution policy.
+Evidence required: state-matrix tests, redaction tests, scrolling tests, fake
+runtime evidence, docs hashes, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app ./internal/agent
+-cover`; `make verify`.
+Stop condition: blocked if visible state requires unavailable evidence or can
+leak configured secrets.
+
+## Phase 52: Responsive Theme And Accessibility
+
+Outcome: all screens remain usable at wide, medium, 80x24, 60-column, and
+minimum sizes across no-color, ANSI, 256-color, and truecolor profiles.
+Scope: display width, Unicode, CJK, combining marks, long values, semantic color
+fallbacks, clipping, overlap, cursor, chrome budget, and stable panel placement.
+Out of scope: new product features or state communicated only by color.
+Evidence required: profile/size goldens, Unicode tests, layout audits, runtime
+captures, docs hashes, and 100% coverage.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked if any supported profile or size loses critical state,
+overlaps content, or produces an invalid cursor position.
+
+## Phase 53: End-User TUI Acceptance And Release Evidence
+
+Outcome: the rewritten TUI is accepted through tests, real Windows Terminal
+screenshots, deterministic frames, Windows executable smoke, docs, parity, and
+traceability evidence.
+Scope: canonical verification, executable build and checksum, startup/palette/
+picker/chat/tool/cancel/blocked/resize/exit smoke, screenshots, docs refresh,
+and previous-roadmap resume decision.
+Out of scope: unverified publication claims or unrelated feature intake.
+Evidence required: 100% coverage, real and deterministic captures, executable
+path/hash/timestamp, smoke log, docs hashes, and complete status/traceability.
+Verification commands: `make verify`; `go build -trimpath -o
+dist/recomphamr.exe ./cmd/recomphamr`; executable summary, diagnostic, and TUI
+smoke commands.
+Stop condition: blocked if tests, docs, screenshots, executable evidence,
+parity, and traceability do not agree.

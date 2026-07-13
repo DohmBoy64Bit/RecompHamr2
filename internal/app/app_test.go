@@ -15,6 +15,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"recomphamr2/internal/agent"
 	"recomphamr2/internal/config"
@@ -266,8 +267,9 @@ func TestComposeRuntimeStartsOnLauncher(t *testing.T) {
 		PendingTool:   runtime.TUI.Layout.PendingTool,
 		MemoryStatus:  runtime.TUI.Layout.MemoryStatus,
 	})
-	for _, want := range []string{"RECOMP HAMR", "Ask RecompHamr", "Build * lmstudio-amd * ready"} {
-		if !strings.Contains(view, want) {
+	plainView := ansi.Strip(view)
+	for _, want := range []string{"RECOMP HAMR", "Ask RecompHamr", "ready  lmstudio-amd  ready"} {
+		if !strings.Contains(plainView, want) {
 			t.Fatalf("startup launcher missing %q:\n%s", want, view)
 		}
 	}
@@ -435,8 +437,22 @@ func TestLiveModelSlashPromptCancelAndQuit(t *testing.T) {
 	model = updated.(liveModel)
 	updated, cmd = model.Update(keyCode(tea.KeyEnter))
 	model = updated.(liveModel)
-	if cmd != nil || !strings.Contains(model.View().Content, "models:") {
+	if cmd != nil || !strings.Contains(model.View().Content, "active model:") {
 		t.Fatalf("slash update cmd=%v view=\n%s", cmd, model.View().Content)
+	}
+	for _, picker := range []string{"/skills", "/mcp"} {
+		model.BubbleModel.State.Composer = picker
+		updated, cmd = model.Update(keyCode(tea.KeyEnter))
+		model = updated.(liveModel)
+		if cmd != nil || model.BubbleModel.LastIntent.Value == "" {
+			t.Fatalf("picker %s cmd=%v intent=%+v", picker, cmd, model.BubbleModel.LastIntent)
+		}
+	}
+	model.BubbleModel.State.Composer = "/zzz"
+	updated, cmd = model.Update(keyCode(tea.KeyEnter))
+	model = updated.(liveModel)
+	if cmd != nil || !strings.Contains(model.BubbleModel.State.Transcript[len(model.BubbleModel.State.Transcript)-1], "unknown command") {
+		t.Fatalf("unknown slash command did not stay local: %+v", model.BubbleModel.State.Transcript)
 	}
 	updated, _ = model.Update(keyText("hello"))
 	model = updated.(liveModel)

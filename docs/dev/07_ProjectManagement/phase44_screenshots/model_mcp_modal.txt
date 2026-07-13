@@ -1,0 +1,13 @@
+                                                 RECOMP HAMR
+                            RE . decomp . recomp . evidence-backed reconstruction
+
+                                              composer > /models
+  Build * lmstudio-amd * ready * memory fresh * skill ghidra-mcp * mcp manager wired * context context=32768
+                         / commands   Tab complete   Ctrl+C cancel/quit   Ctrl+D exit
+
+                                Tip: keep evidence in .rehamr/REPHAMR_STATE.md
+                                                 Model Picker
+                  llama-vulkan       qwen3.6-35b-a3b  context 32768 url http://localhost:8080
+              * lmstudio-amd       qwen/qwen3.6-35b-a3b  context 32768 url http://localhost:1234
+                 lmstudio-fast      openai/gpt-oss-20b  context 32768 url http://localhost:1234
+                    ollama-amd         qwen3.6:27b  context 32768 url http://localhost:11434

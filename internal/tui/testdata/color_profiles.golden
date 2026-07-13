@@ -1,0 +1,4 @@
+no-color: labels+rail+reverse; color=none
+ansi16: basic-color only
+ansi256: indexed-color
+truecolor: rgb-color
