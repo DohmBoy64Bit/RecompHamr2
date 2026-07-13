@@ -3,10 +3,11 @@
 ## RecompHamr2 Feature Reference
 
 `DohmBoy64Bit/RecompHamr2` is the verified feature-reference implementation for
-future ports. Phase 63 freezes commit
-`20727e5ebf4fb8492abd5dee77d70f3c020f1970` with the annotated tag
-`recomphamr2-feature-reference-2026-07-13`. Its TUI is historical evidence and
-is not the presentation implementation to port.
+future ports. The implementation baseline is commit
+`20727e5ebf4fb8492abd5dee77d70f3c020f1970`. The annotated tag
+`recomphamr2-feature-reference-2026-07-13` points to Phase 63's lineage checkpoint
+`888c20f`, which adds documentation without changing product code. Its TUI is
+historical evidence and is not the presentation implementation to port.
 
 ## Legacy RecompHamr
 
