@@ -18,6 +18,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"recomphamr2/internal/agent"
+	"recomphamr2/internal/commands"
 	"recomphamr2/internal/config"
 	"recomphamr2/internal/llm"
 	"recomphamr2/internal/mcp"
@@ -240,13 +241,10 @@ func TestComposeRuntimeLoadsMemory(t *testing.T) {
 	if !strings.Contains(runtime.MemoryStatus, "verified bytes=16 truncated=true") {
 		t.Fatalf("MemoryStatus = %q", runtime.MemoryStatus)
 	}
-	if runtime.TUI.Layout.Mode != "ready" || runtime.TUI.Layout.ActiveModel != runtime.Config.Active {
-		t.Fatalf("TUI layout = %#v", runtime.TUI.Layout)
+	if runtime.TUI.Mode != "ready" || runtime.TUI.ActiveModel != runtime.Config.Active {
+		t.Fatalf("TUI snapshot = %#v", runtime.TUI)
 	}
-	if len(runtime.TUI.Transcript) != 0 {
-		t.Fatalf("startup transcript = %#v, want empty launcher state", runtime.TUI.Transcript)
-	}
-	if got := runtime.TUI.Submit("/models").Transcript[0]; !strings.Contains(got, "* lmstudio-amd") {
+	if got, _ := commands.Execute(runtime.Commands, "/models"); !strings.Contains(got, "* lmstudio-amd") {
 		t.Fatalf("runtime command dispatch = %q", got)
 	}
 }
@@ -256,19 +254,9 @@ func TestComposeRuntimeStartsOnLauncher(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeRuntime() error = %v", err)
 	}
-	view := runtime.TUI.RenderStyledWithLayout(tui.Layout{
-		Width:         120,
-		Height:        32,
-		Mode:          runtime.TUI.Layout.Mode,
-		ActiveModel:   runtime.TUI.Layout.ActiveModel,
-		ActiveSkill:   runtime.TUI.Layout.ActiveSkill,
-		MCPStatus:     runtime.TUI.Layout.MCPStatus,
-		ContextStatus: runtime.TUI.Layout.ContextStatus,
-		PendingTool:   runtime.TUI.Layout.PendingTool,
-		MemoryStatus:  runtime.TUI.Layout.MemoryStatus,
-	})
+	view := tui.Render(runtime.TUI, nil, 120, 32)
 	plainView := ansi.Strip(view)
-	for _, want := range []string{"RECOMP HAMR", "Ask RecompHamr", "ready  lmstudio-amd  ready"} {
+	for _, want := range []string{"evidence-backed reconstruction", "Ask RecompHamr", "lmstudio-amd  ready"} {
 		if !strings.Contains(plainView, want) {
 			t.Fatalf("startup launcher missing %q:\n%s", want, view)
 		}
@@ -358,7 +346,7 @@ func TestComposeRuntimeActiveProfileBlocked(t *testing.T) {
 }
 
 func TestRuntimeSummaryHandlesNilConfig(t *testing.T) {
-	summary := (Runtime{ProjectDir: "x", MemoryStatus: "unsupported", TUI: tui.Model{Layout: tui.Layout{Mode: "ready"}}}).Summary()
+	summary := (Runtime{ProjectDir: "x", MemoryStatus: "unsupported", TUI: tui.Snapshot{Mode: "ready"}}).Summary()
 	if !strings.Contains(summary, "active=unverified profiles=0") {
 		t.Fatalf("Summary() = %q", summary)
 	}
@@ -371,7 +359,7 @@ func TestRuntimeSummaryReportsConnectedMCP(t *testing.T) {
 	if err := manager.Connect(context.Background(), "ghidra"); err != nil {
 		t.Fatalf("Connect() error = %v", err)
 	}
-	summary := (Runtime{ProjectDir: "x", MCP: manager, MemoryStatus: "unsupported", TUI: tui.Model{Layout: tui.Layout{Mode: "ready"}}}).Summary()
+	summary := (Runtime{ProjectDir: "x", MCP: manager, MemoryStatus: "unsupported", TUI: tui.Snapshot{Mode: "ready"}}).Summary()
 	if !strings.Contains(summary, "autoconnect=connected=1") {
 		t.Fatalf("Summary() = %q", summary)
 	}
@@ -428,52 +416,130 @@ func TestLiveModelSlashPromptCancelAndQuit(t *testing.T) {
 		t.Fatalf("ComposeRuntime() error = %v", err)
 	}
 	model := liveModel{
-		BubbleModel: tui.BubbleModel{State: runtime.TUI, LastAction: tui.ActionNone},
-		runtime:     runtime,
-		model:       &scriptModel{t: t, replies: []llm.Message{{Role: "assistant", Content: "assistant ready"}}},
-		tools:       func(context.Context, llm.ToolCall) (string, error) { return "", nil },
+		TUI:     tui.New(runtime.TUI),
+		runtime: runtime,
+		model:   &scriptModel{t: t, replies: []llm.Message{{Role: "assistant", Content: "assistant ready"}}},
+		tools:   func(context.Context, llm.ToolCall) (string, error) { return "", nil },
 	}
-	updated, cmd := model.Update(keyText("/models"))
+	updated, _ := model.Update(tui.IntentMsg{Kind: tui.IntentCommand, Value: "/models"})
 	model = updated.(liveModel)
-	updated, cmd = model.Update(keyCode(tea.KeyEnter))
-	model = updated.(liveModel)
-	if cmd != nil || !strings.Contains(model.View().Content, "active model:") {
-		t.Fatalf("slash update cmd=%v view=\n%s", cmd, model.View().Content)
+	if !strings.Contains(model.View().Content, "models:") {
+		t.Fatalf("slash output missing: \n%s", model.View().Content)
 	}
-	for _, picker := range []string{"/skills", "/mcp"} {
-		model.BubbleModel.State.Composer = picker
-		updated, cmd = model.Update(keyCode(tea.KeyEnter))
+	updated, _ = model.Update(tui.IntentMsg{Kind: tui.IntentCommand, Value: "/zzz"})
+	model = updated.(liveModel)
+	if !strings.Contains(model.View().Content, "unknown command") {
+		t.Fatalf("unknown slash command missing: \n%s", model.View().Content)
+	}
+	for _, intent := range []tui.IntentMsg{
+		{Kind: tui.IntentModel, Value: "lmstudio-amd"},
+		{Kind: tui.IntentSkill, Value: "ghidra-mcp"},
+		{Kind: tui.IntentMCP, Value: "ghidra"},
+		{Kind: tui.IntentKind("unknown")},
+		{Kind: tui.IntentCommand, Value: "/clear"},
+	} {
+		updated, _ = model.Update(intent)
 		model = updated.(liveModel)
-		if cmd != nil || model.BubbleModel.LastIntent.Value == "" {
-			t.Fatalf("picker %s cmd=%v intent=%+v", picker, cmd, model.BubbleModel.LastIntent)
-		}
-	}
-	model.BubbleModel.State.Composer = "/zzz"
-	updated, cmd = model.Update(keyCode(tea.KeyEnter))
-	model = updated.(liveModel)
-	if cmd != nil || !strings.Contains(model.BubbleModel.State.Transcript[len(model.BubbleModel.State.Transcript)-1], "unknown command") {
-		t.Fatalf("unknown slash command did not stay local: %+v", model.BubbleModel.State.Transcript)
 	}
 	updated, _ = model.Update(keyText("hello"))
 	model = updated.(liveModel)
-	updated, cmd = model.Update(keyCode(tea.KeyEnter))
+	updated, intentCmd := model.Update(keyCode(tea.KeyEnter))
 	model = updated.(liveModel)
-	if cmd == nil || model.BubbleModel.State.Layout.Mode != "thinking" {
-		t.Fatalf("prompt update cmd=%v mode=%q", cmd, model.BubbleModel.State.Layout.Mode)
+	if intentCmd == nil {
+		t.Fatal("prompt did not emit intent")
+	}
+	updated, cmd := model.Update(intentCmd())
+	model = updated.(liveModel)
+	if cmd == nil || model.TUI.Snapshot().Mode != "thinking" {
+		t.Fatalf("prompt update cmd=%v mode=%q", cmd, model.TUI.Snapshot().Mode)
 	}
 	result := cmd().(agentResult)
 	updated, _ = model.Update(result)
 	model = updated.(liveModel)
-	if !strings.Contains(model.View().Content, "assistant: assistant ready") {
+	if !strings.Contains(model.View().Content, "assistant") || !strings.Contains(model.View().Content, "assistant ready") {
 		t.Fatalf("agent result view=\n%s", model.View().Content)
 	}
-	updated, _ = model.Update(keyCtrl('c'))
+	updated, _ = model.Update(tui.IntentMsg{Kind: tui.IntentQuit})
 	model = updated.(liveModel)
-	updated, cmd = model.Update(keyCtrl('c'))
-	model = updated.(liveModel)
-	if cmd == nil || model.BubbleModel.State.Status != "quit" {
-		t.Fatalf("quit cmd=%v status=%q", cmd, model.BubbleModel.State.Status)
+	if model.View().Content == "" {
+		t.Fatal("quit handling corrupted view")
 	}
+}
+
+func TestLiveModelIntentBoundaryExactlyOnce(t *testing.T) {
+	runtime, err := ComposeRuntime(Options{ProjectDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("ComposeRuntime() error = %v", err)
+	}
+	script := &scriptModel{t: t, replies: []llm.Message{{Role: "assistant", Content: "one answer"}}}
+	model := liveModel{
+		TUI:     tui.New(runtime.TUI),
+		runtime: runtime,
+		model:   script,
+		tools:   func(context.Context, llm.ToolCall) (string, error) { return "", nil },
+	}
+
+	updated, agentCmd := model.Update(tui.IntentMsg{Kind: tui.IntentSubmit, Value: "one prompt"})
+	model = updated.(liveModel)
+	if agentCmd == nil || countEntries(model.TUI.Entries(), tui.TranscriptUser, "one prompt") != 1 {
+		t.Fatalf("submit cmd=%v entries=%#v", agentCmd, model.TUI.Entries())
+	}
+	updated, _ = model.Update(agentCmd())
+	model = updated.(liveModel)
+	if script.calls != 1 || countEntries(model.TUI.Entries(), tui.TranscriptAssistant, "one answer") != 1 {
+		t.Fatalf("model calls=%d entries=%#v", script.calls, model.TUI.Entries())
+	}
+
+	for _, intent := range []tui.IntentMsg{
+		{Kind: tui.IntentCommand, Value: "/doctor"},
+		{Kind: tui.IntentModel, Value: "lmstudio-amd"},
+		{Kind: tui.IntentSkill, Value: "ghidra-mcp"},
+		{Kind: tui.IntentMCP, Value: "ghidra"},
+	} {
+		before := len(model.TUI.Entries())
+		updated, cmd := model.Update(intent)
+		model = updated.(liveModel)
+		if cmd != nil || len(model.TUI.Entries()) != before+1 {
+			t.Fatalf("intent %#v cmd=%v entries before=%d after=%d", intent, cmd, before, len(model.TUI.Entries()))
+		}
+	}
+	if len(model.runtime.Commands.ActiveSkills) != 1 || model.runtime.Commands.ActiveSkills[0] != "ghidra-mcp" {
+		t.Fatalf("active skills=%v", model.runtime.Commands.ActiveSkills)
+	}
+
+	cancels := 0
+	model.cancel = func() { cancels++ }
+	updated, _ = model.Update(tui.IntentMsg{Kind: tui.IntentCancel})
+	model = updated.(liveModel)
+	updated, _ = model.Update(tui.IntentMsg{Kind: tui.IntentCancel})
+	model = updated.(liveModel)
+	if cancels != 1 || model.cancel != nil {
+		t.Fatalf("cancel calls=%d cancel=%v", cancels, model.cancel)
+	}
+
+	before := len(model.TUI.Entries())
+	updated, unknownCmd := model.Update(tui.IntentMsg{Kind: tui.IntentKind("unknown")})
+	model = updated.(liveModel)
+	if unknownCmd != nil || len(model.TUI.Entries()) != before {
+		t.Fatalf("unknown intent cmd=%v entries before=%d after=%d", unknownCmd, before, len(model.TUI.Entries()))
+	}
+	_, quitCmd := model.Update(tui.IntentMsg{Kind: tui.IntentQuit})
+	if quitCmd == nil {
+		t.Fatal("quit intent returned no command")
+	}
+	if _, ok := quitCmd().(tea.QuitMsg); !ok {
+		t.Fatalf("quit command message=%T", quitCmd())
+	}
+}
+
+func countEntries(entries []tui.TranscriptEntry, kind tui.TranscriptKind, text string) int {
+	count := 0
+	for _, entry := range entries {
+		if entry.Kind == kind && entry.Text == text {
+			count++
+		}
+	}
+	return count
 }
 
 func TestLiveModelExposesMCPToolsForActiveSkill(t *testing.T) {
@@ -489,16 +555,21 @@ func TestLiveModelExposesMCPToolsForActiveSkill(t *testing.T) {
 	}
 	runtime.MCP = manager
 	runtime.TUI.Env.MCP = manager
+	runtime.Commands.MCP = manager
+	_, runtime.Commands = commands.Execute(runtime.Commands, "/skill ghidra-mcp")
+	runtime.TUI.Env = runtime.Commands
 	model := &toolAwareScriptModel{scriptModel: scriptModel{t: t, replies: []llm.Message{{Role: "assistant", Tools: []llm.ToolCall{{ID: "mcp-1", Name: "ghidra.decompile", Arguments: map[string]any{"address": "0x1000"}}}}, {Role: "assistant", Content: "mcp done"}}}}
 	live := liveModel{
-		BubbleModel: tui.BubbleModel{State: runtime.TUI.Submit("/skill ghidra-mcp"), LastAction: tui.ActionNone},
-		runtime:     runtime,
-		model:       model,
-		tools:       liveToolRunner(runtime),
+		TUI:     tui.New(runtime.TUI),
+		runtime: runtime,
+		model:   model,
+		tools:   liveToolRunner(runtime),
 	}
 	updated, _ := live.Update(keyText("use mcp"))
 	live = updated.(liveModel)
-	updated, cmd := live.Update(keyCode(tea.KeyEnter))
+	updated, intentCmd := live.Update(keyCode(tea.KeyEnter))
+	live = updated.(liveModel)
+	updated, cmd := live.Update(intentCmd())
 	live = updated.(liveModel)
 	result := cmd().(agentResult)
 	if result.err != nil {
@@ -507,7 +578,11 @@ func TestLiveModelExposesMCPToolsForActiveSkill(t *testing.T) {
 	updated, _ = live.Update(result)
 	live = updated.(liveModel)
 
-	transcript := strings.Join(live.BubbleModel.State.Transcript, "\n")
+	var transcriptParts []string
+	for _, entry := range live.TUI.Entries() {
+		transcriptParts = append(transcriptParts, string(entry.Kind)+": "+entry.Text)
+	}
+	transcript := strings.Join(transcriptParts, "\n")
 	if !model.sawTool("ghidra.decompile") || !strings.Contains(transcript, "tool: mcp decompiled") || !strings.Contains(transcript, "assistant: mcp done") {
 		t.Fatalf("mcp transcript=\n%s tools=%v messages=%#v", transcript, model.toolNames, result.messages)
 	}
@@ -518,14 +593,28 @@ func TestLiveModelInitAndBlockedResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ComposeRuntime() error = %v", err)
 	}
-	model := liveModel{BubbleModel: tui.BubbleModel{State: runtime.TUI}, runtime: runtime}
-	if cmd := model.Init(); cmd != nil {
-		t.Fatalf("Init() cmd=%v, want nil", cmd)
+	model := liveModel{TUI: tui.New(runtime.TUI), runtime: runtime}
+	if cmd := model.Init(); cmd == nil {
+		t.Fatal("Init() did not start cursor blink")
 	}
 	updated, _ := model.Update(agentResult{err: errors.New("backend failed")})
 	model = updated.(liveModel)
-	if model.BubbleModel.State.Status != "blocked" || !strings.Contains(model.View().Content, "blocked: backend failed") {
-		t.Fatalf("blocked result status=%q view=\n%s", model.BubbleModel.State.Status, model.View().Content)
+	if model.TUI.Snapshot().Status != "blocked" || !strings.Contains(model.View().Content, "blocked") || !strings.Contains(model.View().Content, "backend failed") {
+		t.Fatalf("blocked result status=%q view=\n%s", model.TUI.Snapshot().Status, model.View().Content)
+	}
+}
+
+func TestLiveModelBlurBeforeFirstRenderDoesNotPanic(t *testing.T) {
+	runtime, err := ComposeRuntime(Options{ProjectDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("ComposeRuntime() error = %v", err)
+	}
+	model := liveModel{TUI: tui.New(runtime.TUI), runtime: runtime}
+	updated, _ := model.Update(tea.BlurMsg{})
+	model = updated.(liveModel)
+	view := model.View()
+	if view.Cursor != nil || !strings.Contains(view.Content, "RECOMP") {
+		t.Fatalf("blurred first frame cursor=%#v content=%q", view.Cursor, view.Content)
 	}
 }
 
@@ -536,8 +625,8 @@ func TestLiveModelCancellationCancelsAgentContext(t *testing.T) {
 	}
 	block := make(chan struct{})
 	model := liveModel{
-		BubbleModel: tui.BubbleModel{State: runtime.TUI, LastAction: tui.ActionNone},
-		runtime:     runtime,
+		TUI:     tui.New(runtime.TUI),
+		runtime: runtime,
 		model: modelFunc(func(ctx context.Context, _ []llm.Message) (llm.Message, error) {
 			<-block
 			return llm.Message{}, ctx.Err()
@@ -546,16 +635,18 @@ func TestLiveModelCancellationCancelsAgentContext(t *testing.T) {
 	}
 	updated, _ := model.Update(keyText("cancel"))
 	model = updated.(liveModel)
-	updated, cmd := model.Update(keyCode(tea.KeyEnter))
+	updated, intentCmd := model.Update(keyCode(tea.KeyEnter))
 	model = updated.(liveModel)
-	updated, _ = model.Update(keyCtrl('c'))
+	updated, cmd := model.Update(intentCmd())
+	model = updated.(liveModel)
+	updated, _ = model.Update(tui.IntentMsg{Kind: tui.IntentCancel})
 	model = updated.(liveModel)
 	close(block)
 	result := cmd().(agentResult)
 	updated, _ = model.Update(result)
 	model = updated.(liveModel)
-	if model.BubbleModel.State.Status != "cancelled" {
-		t.Fatalf("cancel status = %q result=%v", model.BubbleModel.State.Status, result.err)
+	if model.TUI.Snapshot().Status != "cancelled" {
+		t.Fatalf("cancel status = %q result=%v", model.TUI.Snapshot().Status, result.err)
 	}
 }
 
@@ -831,8 +922,9 @@ func TestRunSmokePromptToolLoopAndMemory(t *testing.T) {
 	if !model.sawMemory {
 		t.Fatal("fake model did not receive project memory")
 	}
-	for _, want := range []string{"assistant: verified: fake runtime smoke complete", "tool: fake tool result", "RecompHamr"} {
-		if !strings.Contains(report.Render, want) {
+	plainRender := ansi.Strip(report.Render)
+	for _, want := range []string{"verified: fake runtime smoke complete", "fake tool result", "Ask RecompHamr"} {
+		if !strings.Contains(plainRender, want) {
 			t.Fatalf("prompt smoke render missing %q:\n%s", want, report.Render)
 		}
 	}

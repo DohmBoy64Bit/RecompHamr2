@@ -40,3 +40,20 @@ glyph construction, green palette, or behavior 1:1.
 Corrective claims require three checks when applicable: local source truth,
 automated tests, and runtime or deterministic render evidence. Unsupported
 claims remain labeled `unverified`, `unsupported`, or `blocked`.
+
+## Phase 54 Replacement Baseline
+
+User screenshots after Phase 53 verify that the prior corrective track is not
+accepted. `internal/tui` stores composer text in both its pure model and Bubbles
+textarea, routes keys through custom and component handlers, stores transcript
+position both as a custom offset and viewport state, derives overlays from
+composer strings, and reconstructs the cursor from rendered output. The app also
+polls mutable `LastIntent` state after updates. These are replacement targets,
+not compatibility requirements.
+
+The retained boundary is backend ownership: `internal/app` executes effects;
+commands, agent, tools, MCP, config, skills, memory, LLM, and security remain in
+their existing packages. The replacement may retain typed intent concepts and
+verified runtime data, but no old widget state, renderer, key router, cursor
+calculator, scrolling offset, palette implementation, or golden fixture is
+preserved solely for compatibility.

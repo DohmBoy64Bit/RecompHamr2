@@ -1,283 +1,426 @@
 package tui
 
 import (
-	"fmt"
 	"os"
 	"strings"
-	"unicode/utf8"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
-	"recomphamr2/internal/commands"
 	"recomphamr2/internal/security"
 )
 
-// New returns an empty terminal shell model.
-func New(env commands.Environment) Model {
-	return Model{Env: env, Layout: DefaultLayout(), HistoryIndex: 0}
+// Model is the complete Bubble Tea TUI state.
+type Model struct {
+	snapshot   Snapshot
+	composer   textareaModel
+	transcript viewportModel
+	picker     list.Model
+	help       helpModel
+	keys       keyMap
+	entries    []TranscriptEntry
+	overlay    overlayKind
+	width      int
+	height     int
+	history    []string
+	historyAt  int
+	quitArmed  bool
+	newOutput  bool
+	profile    colorprofile.Profile
 }
 
-// DefaultLayout returns RecompHamr's evidence-first terminal layout defaults.
-func DefaultLayout() Layout {
-	layout := Layout{
-		ColorProfile:  colorprofile.ANSI256,
-		Width:         DefaultWidth,
-		Height:        DefaultHeight,
-		Mode:          "plan",
-		ActiveModel:   "unverified",
-		ActiveSkill:   "none",
-		MCPStatus:     "gated",
-		ContextStatus: "local budget pending",
-		PendingTool:   "none",
-		MemoryStatus:  "refreshed",
+// Interface aliases keep component ownership explicit without exposing fields.
+type textareaModel = textarea.Model
+type viewportModel = viewport.Model
+type helpModel = help.Model
+
+// New returns a fully initialized Bubble Tea model.
+func New(snapshot Snapshot) Model {
+	profile := colorprofile.ANSI256
+	if _, noColor := os.LookupEnv("NO_COLOR"); noColor {
+		profile = colorprofile.ASCII
 	}
-	if _, disabled := os.LookupEnv("NO_COLOR"); disabled {
-		layout.ColorProfile = colorprofile.ASCII
+	composer := newComposer()
+	composer.SetVirtualCursor(false)
+	model := Model{
+		snapshot:   snapshot,
+		composer:   composer,
+		transcript: newViewport(),
+		picker:     newPicker(profile),
+		help:       help.New(),
+		keys:       newKeyMap(),
+		width:      DefaultWidth,
+		height:     DefaultHeight,
+		profile:    profile,
 	}
-	return layout
+	styleComponents(&model.composer, &model.picker, &model.help, profile)
+	model.historyAt = 0
+	model.resize()
+	return model
 }
 
-// Update applies one terminal event and returns the requested side effect.
-func (m Model) Update(event Event) (Model, Action) {
-	if event.Width > 0 {
-		m.Layout.Width = event.Width
-	}
-	if event.Height > 0 {
-		m.Layout.Height = event.Height
-	}
-	if event.Paste != "" {
-		m = m.Paste(event.Paste)
-	}
-	if event.Text != "" {
-		m.Composer += event.Text
-		m.QuitArmed = false
-		m.PaletteIndex = 0
-	}
-	if event.Key == "" {
-		return m, ActionNone
-	}
-	return m.handleKey(event.Key)
+// Init starts textarea cursor blinking.
+func (m Model) Init() tea.Cmd {
+	return textarea.Blink
 }
 
-// Submit dispatches slash commands or appends plain user text.
-func (m Model) Submit(text string) Model {
-	text = strings.TrimSpace(text)
-	if text == "" && len(m.Attachments) == 0 {
-		return m
-	}
-	m.History = append(m.History, text)
-	m.HistoryIndex = len(m.History)
-	if strings.HasPrefix(text, "/") {
-		out, env := commands.Execute(m.Env, text)
-		m.Env = env
-		m = m.appendTranscript(out)
-		m.Attachments = nil
-		m.Composer = ""
-		return m
-	}
-	m = m.appendTranscript("user: " + submissionText(text, m.Attachments))
-	m.Attachments = nil
-	m.Composer = ""
-	return m
+// Snapshot returns the current immutable app-owned state.
+func (m Model) Snapshot() Snapshot {
+	return m.snapshot
 }
 
-// Paste inserts small single-line text or creates a large-paste chip.
-func (m Model) Paste(text string) Model {
-	if isLargePaste(text) {
-		name := fmt.Sprintf("paste-%d", len(m.Attachments)+1)
-		m.Attachments = append(m.Attachments, Attachment{Name: name, Content: text})
-		m = m.appendTranscript(fmt.Sprintf("paste: %s (%d bytes)", name, len(text)))
-		return m
-	}
-	m.Composer += text
-	return m
+// ComposerValue returns the authoritative textarea value.
+func (m Model) ComposerValue() string {
+	return m.composer.Value()
 }
 
-// Debug records a redacted debug line when debug mode is enabled.
-func (m Model) Debug(text string) Model {
-	if !m.DebugEnabled {
-		return m
-	}
-	m.DebugLog = append(m.DebugLog, redact(text, m.DebugSecrets))
-	return m
+// Entries returns a copy of the semantic transcript.
+func (m Model) Entries() []TranscriptEntry {
+	return append([]TranscriptEntry(nil), m.entries...)
 }
 
-// Improvements documents intentional differences from OpenCode-style terminal agents.
-func Improvements() []string {
-	return []string{
-		"evidence rail keeps memory, skill, MCP, and tool state visible for reverse-engineering work",
-		"right-side evidence deck separates verified context from chat transcript to reduce claim drift",
-		"compact mode collapses panels into status bands so narrow terminals remain usable",
-		"RecompHamr-owned visual tokens keep the UI distinct from OpenCode while preserving terminal polish",
-	}
-}
-
-func (m Model) handleKey(key string) (Model, Action) {
-	switch key {
-	case KeyEnter:
-		before := len(m.Transcript)
-		m = m.Submit(m.Composer)
-		if len(m.Transcript) == before {
-			return m, ActionNone
+// Update handles Bubble Tea and app-owned messages.
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch typed := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width, m.height = typed.Width, typed.Height
+		m.resize()
+		return m, nil
+	case tea.ColorProfileMsg:
+		m.profile = typed.Profile
+		styleComponents(&m.composer, &m.picker, &m.help, m.profile)
+		return m, nil
+	case ColorProfileMsg:
+		m.profile = typed.Profile
+		styleComponents(&m.composer, &m.picker, &m.help, m.profile)
+		return m, nil
+	case SnapshotMsg:
+		m.snapshot = typed.Snapshot
+		return m, nil
+	case TranscriptMsg:
+		m.appendTranscript(typed.Entries)
+		return m, nil
+	case ClearTranscriptMsg:
+		m.entries = nil
+		m.newOutput = false
+		m.transcript.SetContent("")
+		return m, nil
+	case tea.FocusMsg:
+		return m, m.composer.Focus()
+	case tea.BlurMsg:
+		m.composer.Blur()
+		return m, nil
+	case tea.KeyPressMsg:
+		return m.updateKey(typed)
+	case tea.PasteMsg:
+		var cmd tea.Cmd
+		m.composer, cmd = m.composer.Update(msg)
+		return m, cmd
+	case tea.MouseWheelMsg:
+		if len(m.entries) == 0 {
+			return m, nil
 		}
-		return m, ActionSubmit
-	case KeyBackspace:
-		m.Composer = trimLastRune(m.Composer)
-		return m, ActionNone
-	case KeyUp:
-		if rows := m.overlayRows(); len(rows) > 0 {
-			m.PaletteIndex--
-			if m.PaletteIndex < 0 {
-				m.PaletteIndex = 0
-			}
-			return m, ActionNone
-		}
-		m = m.recall(-1)
-		return m, ActionNone
-	case KeyDown:
-		if rows := m.overlayRows(); len(rows) > 0 {
-			m.PaletteIndex++
-			if m.PaletteIndex >= len(rows) {
-				m.PaletteIndex = len(rows) - 1
-			}
-			return m, ActionNone
-		}
-		m = m.recall(1)
-		return m, ActionNone
-	case KeyTab:
-		m = m.completeComposer()
-		return m, ActionNone
-	case KeyCtrlC:
-		return m.ctrlC()
-	case KeyCtrlD:
-		m.Status = "quit"
-		return m, ActionQuit
-	case KeyEsc:
-		m.QuitArmed = false
-		m.Status = ""
-		return m, ActionNone
+		var cmd tea.Cmd
+		m.transcript, cmd = m.transcript.Update(msg)
+		m.syncTranscriptFollow()
+		return m, cmd
 	default:
-		m.Status = "unsupported key: " + key
-		return m, ActionNone
+		var cmd tea.Cmd
+		if m.overlay != overlayNone {
+			m.picker, cmd = m.picker.Update(msg)
+		} else {
+			m.composer, cmd = m.composer.Update(msg)
+		}
+		return m, cmd
 	}
 }
 
-func (m Model) completeComposer() Model {
-	text := strings.TrimSpace(m.Composer)
-	if !strings.HasPrefix(text, "/") {
-		return m
+func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	name := strings.ToLower(msg.String())
+	if m.width < MinimumWidth || m.height < MinimumHeight {
+		if name == "ctrl+d" {
+			return m, emitIntent(IntentQuit, "")
+		}
+		return m, nil
 	}
-	fields := strings.Fields(text)
-	prefix := text
-	suffix := ""
-	if len(fields) > 0 {
-		prefix = fields[0]
-		if len(fields) > 1 {
-			suffix = " " + strings.Join(fields[1:], " ")
+	switch name {
+	case "ctrl+d":
+		return m, emitIntent(IntentQuit, "")
+	case "ctrl+c":
+		if m.snapshot.PendingTool != "" && m.snapshot.PendingTool != "none" || m.snapshot.Mode == "thinking" || m.snapshot.Mode == "streaming" {
+			m.quitArmed = false
+			return m, emitIntent(IntentCancel, "")
+		}
+		if m.quitArmed {
+			return m, emitIntent(IntentQuit, "")
+		}
+		m.quitArmed = true
+		m.snapshot.Status = "press Ctrl+C again to quit"
+		return m, nil
+	case "esc":
+		if m.overlay != overlayNone {
+			m.closeOverlay()
+		} else {
+			m.quitArmed = false
+			m.snapshot.Status = ""
+		}
+		return m, nil
+	}
+	m.quitArmed = false
+	if m.overlay != overlayNone {
+		return m.updateOverlay(msg)
+	}
+	if name == "shift+enter" || name == "ctrl+j" {
+		m.composer.InsertString("\n")
+		return m, nil
+	}
+	switch name {
+	case "enter":
+		return m.submit()
+	case "?":
+		if strings.TrimSpace(m.composer.Value()) == "" {
+			m.openOverlay(overlayHelp)
+			return m, nil
+		}
+	case "pgup", "pgdown":
+		if len(m.entries) > 0 {
+			var cmd tea.Cmd
+			m.transcript, cmd = m.transcript.Update(msg)
+			m.syncTranscriptFollow()
+			return m, cmd
+		}
+		return m, nil
+	case "up":
+		if m.composer.LineCount() == 1 {
+			m.recall(-1)
+			return m, nil
+		}
+	case "down":
+		if m.composer.LineCount() == 1 {
+			m.recall(1)
+			return m, nil
 		}
 	}
-	matches := CompleteCommand(prefix)
-	if len(matches) == 0 {
-		m.Status = "unverified: no command matches " + prefix
-		return m
+	var cmd tea.Cmd
+	m.composer, cmd = m.composer.Update(msg)
+	if m.composer.Value() == "/" {
+		m.openOverlay(overlayCommands)
 	}
-	index := m.PaletteIndex
-	if index < 0 || index >= len(matches) {
-		index = 0
-	}
-	m.Composer = matches[index] + suffix
-	if suffix == "" {
-		m.Composer += " "
-	}
-	m.Status = "completed command: " + matches[index]
-	return m
+	return m, cmd
 }
 
-func (m Model) ctrlC() (Model, Action) {
-	if m.Layout.PendingTool != "none" || m.Layout.Mode == "thinking" || m.Layout.Mode == "streaming" {
-		m.Layout.PendingTool = "none"
-		m.Layout.Mode = "idle"
-		m.Status = "cancelled"
-		m = m.appendTranscript("status: cancelled")
-		m.QuitArmed = false
-		return m, ActionCancel
+func (m Model) updateOverlay(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	name := strings.ToLower(msg.String())
+	switch name {
+	case "backspace":
+		if m.overlay == overlayCommands && m.picker.FilterInput.Value() == "" {
+			m.closeOverlay()
+			m.composer.Reset()
+			return m, nil
+		}
+	case "enter":
+		return m.acceptSelection()
+	case "tab":
+		return m.completeSelection()
 	}
-	if m.QuitArmed {
-		m.Status = "quit"
-		return m, ActionQuit
-	}
-	m.QuitArmed = true
-	m.Status = "press Ctrl+C again to quit"
-	return m, ActionNone
+	var cmd tea.Cmd
+	m.picker, cmd = m.picker.Update(msg)
+	return m, cmd
 }
 
-func (m Model) recall(delta int) Model {
-	if len(m.History) == 0 {
-		return m
+func (m Model) submit() (tea.Model, tea.Cmd) {
+	value := strings.TrimSpace(m.composer.Value())
+	if value == "" || value == "/" {
+		return m, nil
 	}
-	next := m.HistoryIndex + delta
+	m.history = append(m.history, value)
+	m.historyAt = len(m.history)
+	m.composer.Reset()
+	if strings.HasPrefix(value, "/") {
+		return m, emitIntent(IntentCommand, value)
+	}
+	return m, emitIntent(IntentSubmit, value)
+}
+
+func (m Model) acceptSelection() (tea.Model, tea.Cmd) {
+	selected, ok := m.picker.SelectedItem().(pickerItem)
+	if !ok || selected.blocked {
+		return m, nil
+	}
+	if m.overlay == overlayCommands {
+		switch selected.name {
+		case "/models":
+			m.openOverlay(overlayModels)
+			return m, nil
+		case "/skills", "/skill":
+			m.openOverlay(overlaySkills)
+			return m, nil
+		case "/mcp":
+			m.openOverlay(overlayMCP)
+			return m, nil
+		case "/help":
+			m.openOverlay(overlayHelp)
+			return m, nil
+		}
+		if commandNeedsInput(selected.name) {
+			m.composer.SetValue(selected.name + " ")
+			m.composer.MoveToEnd()
+			m.closeOverlay()
+			return m, nil
+		}
+		m.closeOverlay()
+		m.composer.Reset()
+		return m, emitIntent(IntentCommand, selected.name)
+	}
+	if m.overlay == overlayHelp {
+		m.composer.SetValue(selected.name + " ")
+		m.composer.MoveToEnd()
+		m.closeOverlay()
+		return m, nil
+	}
+	m.closeOverlay()
+	m.composer.Reset()
+	return m, emitIntent(selected.kind, selected.name)
+}
+
+func commandNeedsInput(name string) bool {
+	return name == "/skill-audit" || name == "/skill-new"
+}
+
+func (m Model) completeSelection() (tea.Model, tea.Cmd) {
+	selected, ok := m.picker.SelectedItem().(pickerItem)
+	if !ok || selected.blocked {
+		return m, nil
+	}
+	m.composer.SetValue(selected.name + " ")
+	m.composer.MoveToEnd()
+	m.closeOverlay()
+	return m, nil
+}
+
+func (m *Model) openOverlay(kind overlayKind) {
+	m.overlay = kind
+	var items []list.Item
+	if kind == overlayCommands {
+		items = commandItems()
+		m.picker.Title = "Command palette"
+	} else {
+		for _, item := range pickerItems(kind, m.snapshot) {
+			items = append(items, item)
+		}
+		m.picker.Title = overlayTitle(kind)
+	}
+	_ = m.picker.SetItems(items)
+	m.picker.ResetSelected()
+	if kind == overlayCommands {
+		m.picker.SetFilterText(pickerQuery(m.composer.Value()))
+		m.picker.SetFilterState(list.Filtering)
+	} else {
+		m.picker.SetFilterState(list.Unfiltered)
+	}
+	m.resize()
+}
+
+func (m *Model) closeOverlay() {
+	m.overlay = overlayNone
+	m.picker.SetFilterState(list.Unfiltered)
+	_ = m.composer.Focus()
+	m.resize()
+}
+
+func overlayTitle(kind overlayKind) string {
+	switch kind {
+	case overlayModels:
+		return "Select model"
+	case overlaySkills:
+		return "Select skill"
+	case overlayMCP:
+		return "MCP servers"
+	case overlayHelp:
+		return "Help"
+	default:
+		return "Command palette"
+	}
+}
+
+func (m *Model) recall(delta int) {
+	if len(m.history) == 0 {
+		return
+	}
+	next := m.historyAt + delta
 	if next < 0 {
 		next = 0
 	}
-	if next > len(m.History) {
-		next = len(m.History)
+	if next > len(m.history) {
+		next = len(m.history)
 	}
-	m.HistoryIndex = next
-	if next == len(m.History) {
-		m.Composer = ""
-		return m
+	m.historyAt = next
+	if next == len(m.history) {
+		m.composer.Reset()
+		return
 	}
-	m.Composer = m.History[next]
-	return m
+	m.composer.SetValue(m.history[next])
+	m.composer.MoveToEnd()
 }
 
-func trimLastRune(text string) string {
-	if text == "" {
-		return ""
+func (m *Model) appendTranscript(entries []TranscriptEntry) {
+	if len(entries) == 0 {
+		return
 	}
-	_, size := utf8.DecodeLastRuneInString(text)
-	return text[:len(text)-size]
+	follow := len(m.entries) == 0 || m.transcript.AtBottom()
+	for _, entry := range entries {
+		entry.Text = normalizeBody(entry.Kind, redact(entry.Text, m.snapshot.Secrets))
+		m.entries = append(m.entries, entry)
+	}
+	m.transcript.SetContent(renderTranscript(m.entries, m.laneWidth(), m.profile))
+	if follow {
+		m.transcript.GotoBottom()
+		m.newOutput = false
+	} else {
+		m.newOutput = true
+	}
 }
 
-func (m Model) appendTranscript(lines ...string) Model {
-	if len(lines) == 0 {
-		return m
+func (m *Model) syncTranscriptFollow() {
+	if m.transcript.AtBottom() {
+		m.newOutput = false
 	}
-	if m.TranscriptOffset > 0 {
-		m.TranscriptOffset += len(lines)
-		m.NewOutput = true
-	}
-	m.Transcript = append(m.Transcript, lines...)
-	return m
 }
 
-// AppendRuntimeTranscript appends app-owned output while preserving transcript follow state.
-func (m Model) AppendRuntimeTranscript(lines ...string) Model {
-	return m.appendTranscript(lines...)
+func normalizeBody(kind TranscriptKind, text string) string {
+	trimmed := strings.TrimSpace(text)
+	prefix := string(kind) + ":"
+	if strings.HasPrefix(strings.ToLower(trimmed), prefix) {
+		return strings.TrimSpace(trimmed[len(prefix):])
+	}
+	return trimmed
 }
 
-func (m Model) scrollTranscript(delta int) Model {
-	m.TranscriptOffset += delta
-	if m.TranscriptOffset < 0 {
-		m.TranscriptOffset = 0
+// ParseEntry classifies one existing backend output line for presentation.
+func ParseEntry(line string) TranscriptEntry {
+	trimmed := strings.TrimSpace(line)
+	lower := strings.ToLower(trimmed)
+	classes := []TranscriptKind{TranscriptUser, TranscriptAssistant, TranscriptTool, TranscriptMCP, TranscriptVerified, TranscriptWarning, TranscriptBlocked, TranscriptUnsupported, TranscriptAttachment}
+	for _, kind := range classes {
+		prefix := string(kind) + ":"
+		if strings.HasPrefix(lower, prefix) {
+			return TranscriptEntry{Kind: kind, Text: strings.TrimSpace(trimmed[len(prefix):])}
+		}
 	}
-	maximum := len(m.Transcript) - 1
-	if maximum < 0 {
-		maximum = 0
-	}
-	if m.TranscriptOffset > maximum {
-		m.TranscriptOffset = maximum
-	}
-	if m.TranscriptOffset == 0 {
-		m.NewOutput = false
-	}
-	return m
+	return TranscriptEntry{Kind: TranscriptNote, Text: trimmed}
 }
 
 func redact(text string, secrets []string) string {
-	out := text
 	for _, secret := range secrets {
-		out = security.RedactSecret(out, secret)
+		text = security.RedactSecret(text, secret)
 	}
-	return out
+	return text
+}
+
+func emitIntent(kind IntentKind, value string) tea.Cmd {
+	return func() tea.Msg { return IntentMsg{Kind: kind, Value: value} }
 }

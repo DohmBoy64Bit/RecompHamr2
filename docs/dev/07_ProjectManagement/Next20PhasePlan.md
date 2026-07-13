@@ -417,6 +417,25 @@ and the complete local `tui-design` guidance before and after work, compares
 relevant documentation hashes, updates user/developer memory, and closes only
 after `make verify` reports 100% statement and documentation coverage.
 
+## Complete Bubble Tea Replacement Phases 54-62
+
+User interaction evidence rejected phases 45-53: placeholder text behaved like
+input, bare `/` reached command execution, and parallel component/state paths
+made editing and rendering disagree. Phases 54-62 supersede those TUI internals
+without deleting their historical evidence. The extension roadmap remains paused.
+
+| Phase | Goal | Status |
+|---|---|---|
+| 54 | Governance and rejected baseline | complete |
+| 55 | Replacement UX and contract | complete |
+| 56 | Atomic architecture reset | complete |
+| 57 | Authoritative composer | complete |
+| 58 | Authoritative transcript | complete |
+| 59 | Authoritative palettes and pickers | complete |
+| 60 | Responsive layout and theme | complete |
+| 61 | Runtime integration | complete |
+| 62 | Manual acceptance and release evidence | automated gates complete; user acceptance pending |
+
 ## Public Interfaces And Types
 
 - MCP protocol/client/manager interfaces live under `internal/mcp` and must

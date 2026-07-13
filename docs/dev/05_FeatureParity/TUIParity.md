@@ -113,3 +113,42 @@ Corrective rewrite acceptance:
   `dist/recomphamr.exe` was built locally, `--summary` and `--diagnostic`
   smoked successfully, and the executable SHA-256 is recorded in
   `Phase44TUIScreenshotEvidence.md`.
+- Phase 53 corrective layout work removes duplicated semantic labels, keeps
+  routine progress out of transcript history, anchors bounded overlays above a
+  fixed composer, derives cursor coordinates from the final rendered frame,
+  and uses one centered content lane. Automated visual acceptance is retired;
+  user-captured startup, palette, and transcript screenshots remain pending.
+- Phase 54 supersedes phases 37-53 for implementation acceptance. The verified
+  backend behaviors remain parity requirements, while the parallel composer,
+  viewport, key routing, cursor, overlay, render, and intent-polling internals
+  are explicitly rejected and scheduled for atomic replacement in Phase 56.
+- Phase 56 replaces those internals. Backend parity behavior remains in its
+  owning packages, while the new frontend uses one component tree and typed
+  Bubble Tea messages. Focused TUI/app tests prove 100% statement coverage;
+  visual and interaction acceptance remains assigned to phases 57-62.
+- Phase 58 makes the Bubbles viewport authoritative for transcript scrolling and
+  follow behavior. Semantic labels are normalized without duplication, secrets
+  are redacted before rendering, paused readers receive explicit new-output
+  feedback, and long tool/MCP blocks end with `output truncated`.
+- Phase 59 makes one Bubbles list authoritative for every palette and picker.
+  Registry-backed filtering consumes returned filter messages, browsing supports
+  arrows and `j`/`k`, blocked or empty rows are inert, and accepted selections
+  either emit one typed intent or populate the textarea when input is required.
+- Phase 60 implements one responsive Lip Gloss layout tree with an original
+  RecompHamr wordmark, stable composer geometry, semantic picker rows, explicit
+  blocked/selected labels, four color profiles, and display-width-safe Unicode.
+  Required sizes have deterministic clipping, height, width, and cursor tests.
+- Phase 61 proves the typed frontend/backend boundary. Submit, command, model,
+  skill, MCP, cancel, quit, and unknown intents are tested for exact-once or
+  inert behavior, while fake agent, tool, MCP, blocked, and cancellation flows
+  return immutable snapshots and semantic transcript messages.
+- Phase 62 automated release gates build and smoke the Windows executable and
+  verify that Bubbles component chrome obeys ANSI16, ANSI256, truecolor, and
+  `NO_COLOR` profiles. Exact binary evidence is recorded in
+  `Phase62TUIAcceptanceEvidence.md`. Final TUI parity acceptance remains pending
+  until the user approves six real WezTerm screenshots.
+- Phase 62 live acceptance found and corrected a startup panic when focus
+  reporting delivered `BlurMsg` before the first frame. Both startup and chat
+  now render safely with no component cursor while blurred, and app-boundary
+  coverage reproduces the production message order. Fresh manual screenshots
+  remain required.

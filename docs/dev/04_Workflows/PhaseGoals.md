@@ -970,3 +970,145 @@ dist/recomphamr.exe ./cmd/recomphamr`; executable summary, diagnostic, and TUI
 smoke commands.
 Stop condition: blocked if tests, docs, screenshots, executable evidence,
 parity, and traceability do not agree.
+
+Visual acceptance clarification: deterministic goldens prove layout invariants
+but cannot approve visual quality. Real screenshots must be captured manually
+by the user from the rebuilt `dist/recomphamr.exe`. Automated screenshot capture
+is excluded from acceptance. Phase 53 remains open until startup, palette, and
+active-transcript screenshots are reviewed and accepted.
+
+## Phase 54: Bubble Tea Replacement Governance And Rejected Baseline
+
+Outcome: phases 54-62 are the active TUI replacement track and phases 37-53
+remain rejected historical evidence rather than an implementation base.
+Scope: source and screenshot inventory, backend dependency map, deletion
+boundaries, docs hashes, roadmap, parity, traceability, and status memory.
+Out of scope: TUI source changes, backend behavior changes, or visual acceptance.
+Evidence required: local imports and types, supplied screenshots, current tests,
+pre/post documentation hashes, docscheck, and canonical verification.
+Verification commands: `make docscheck`; `make verify`.
+Stop condition: blocked if any state or side effect cannot be assigned to either
+the replaceable TUI or its existing backend owner.
+
+## Phase 55: Replacement UX And Contract
+
+Outcome: every screen, breakpoint, interaction, state owner, intent, and manual
+acceptance requirement is decision-complete before source replacement.
+Scope: startup, chat, composer, command palette, model/skill/MCP/help pickers,
+runtime states, responsive geometry, semantic theme, clutter limits, and typed
+frontend/backend messages.
+Out of scope: implementation, copied third-party design, or invented runtime data.
+Evidence required: wireframes, state ownership table, interaction table,
+non-copying rationale, docs hashes, and docscheck.
+Verification commands: `make docscheck`; `make verify`.
+Stop condition: blocked if implementation would require an undocumented design
+or ownership decision.
+
+## Phase 56: Atomic TUI Architecture Reset
+
+Outcome: the previous parallel state architecture is removed and replaced by
+one Bubble Tea model with immutable snapshots and typed intent messages.
+Scope: component boundaries, message contracts, app adapter, obsolete source and
+fixture removal, architecture enforcement, docs, and 100% coverage.
+Out of scope: final visual polish or backend feature changes.
+Evidence required: source inspection, dependency checks, focused tests, docs
+hashes, and canonical verification.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make archcheck`; `make verify`.
+Stop condition: blocked if the repository cannot remain buildable or any widget
+requires duplicated state outside its Bubbles model.
+
+## Phase 57: Authoritative Composer
+
+Outcome: Bubbles textarea exclusively owns input, placeholder, editing, paste,
+focus, cursor, multiline growth, history restoration, and reset behavior.
+Scope: composer messages, bare-slash palette opening, submission, history,
+attachments, key sequences, user docs, and 100% coverage.
+Out of scope: transcript scrolling, picker implementation, or backend execution.
+Evidence required: real Bubble Tea key/paste tests and app integration tests.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked if placeholder text or bare `/` can enter command history.
+
+## Phase 58: Authoritative Transcript
+
+Outcome: Bubbles viewport exclusively owns transcript scrolling and follow state.
+Scope: semantic blocks, append/follow/pause, wrapping, truncation, redaction,
+runtime feedback separation, docs, and 100% coverage.
+Out of scope: palette selection or backend transcript generation policy.
+Evidence required: viewport event tests, runtime-state fixtures, redaction tests,
+app integration tests, and canonical verification.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked if scrolling requires a parallel offset or secrets can
+reach measured/rendered text before redaction.
+
+## Phase 59: Authoritative Palettes And Pickers
+
+Outcome: Bubbles list mechanics exclusively own filtering, selection, scrolling,
+and empty states for commands, models, skills, MCP, and help.
+Scope: registry rows, typed selection intents, argument completion, keyboard
+navigation, compact behavior, docs, and 100% coverage.
+Out of scope: direct config, skill, MCP, filesystem, network, or model effects.
+Evidence required: registry completeness, key-sequence tests, intent integration,
+empty/blocked fixtures, and canonical verification.
+Verification commands: `go test ./internal/commands ./internal/tui ./internal/app
+-cover`; `make verify`.
+Stop condition: blocked if visible rows are hard-coded or selection mutates backend state.
+
+## Phase 60: Responsive Layout And Theme
+
+Outcome: one Lip Gloss layout tree provides an original stable RecompHamr UI at
+all supported sizes and color profiles.
+Scope: branding, semantic theme, fixed composer lane, overlay geometry,
+display-width measurement, Unicode, breakpoints, docs, and 100% coverage.
+Out of scope: copied OpenCode composition or unverified metrics.
+Evidence required: deterministic frames, geometry assertions, profile tests,
+manual-design rationale, and canonical verification.
+Verification commands: `go test ./internal/tui ./internal/app -cover`;
+`make verify`.
+Stop condition: blocked on clipping, overlap, panel movement, duplicate labels,
+or invalid cursor positions.
+
+## Phase 61: Replacement Runtime Integration
+
+Outcome: typed frontend intents reach existing app-owned command, agent, tool,
+model, skill, MCP, cancel, and quit behavior exactly once.
+Scope: runtime snapshots, intent dispatch, result messages, fake integrations,
+clean startup/exit, docs, and 100% coverage.
+Out of scope: changing backend semantics or adding product features.
+Evidence required: fake model/tool/MCP tests, command tests, cancellation and
+blocked tests, architecture checks, and canonical verification.
+Verification commands: `go test ./internal/tui ./internal/app ./internal/agent
+-cover`; `make archcheck`; `make verify`.
+Stop condition: blocked if app code accesses widget internals or an intent can be
+executed more than once.
+
+## Phase 62: Manual TUI Acceptance And Release Evidence
+
+Outcome: the replacement is accepted as the final end-user TUI through tests,
+fresh executable evidence, user-captured WezTerm screenshots, and complete docs.
+Scope: canonical verification, executable build/hash/smoke, startup, palette,
+chat, picker, blocked and 80x24 screenshots, parity, traceability, and roadmap.
+Out of scope: automated visual approval or unrelated feature intake.
+Evidence required: 100% coverage, executable metadata, smoke results, docs hashes,
+manual screenshots, and explicit user acceptance.
+Verification commands: `make verify`; `go build -trimpath -o
+dist/recomphamr.exe ./cmd/recomphamr`; summary and diagnostic smoke.
+Stop condition: phase remains open until all evidence agrees and the user accepts
+the real terminal screens.
+
+### Phase 62 Corrective Goal: Focus-Safe First Render
+
+Outcome: bare launch renders safely whether the terminal reports focus or blur
+before the first frame.
+Scope: optional Bubbles textarea cursor handling in startup and chat, production
+app-boundary regression coverage, executable rebuild, docs, and release evidence.
+Out of scope: visual redesign or backend behavior changes.
+Evidence required: the reported panic stack, blurred startup/chat tests, a
+blur-before-first-render app test, 100% coverage, fresh executable metadata, and
+real-terminal confirmation.
+Verification commands: `go test ./internal/tui ./internal/app -cover`; `make
+verify`; executable summary and diagnostic smoke; bare launch in WezTerm.
+Stop condition: blocked if a legitimate focus transition can still dereference
+an absent component cursor or if the rebuilt executable fails canonical gates.

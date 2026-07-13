@@ -11,6 +11,25 @@ go run ./cmd/recomphamr --diagnostic
 
 Report unsupported behavior as `unsupported`, unknown facts as `unverified`, and missing external evidence as `blocked`.
 
+## TUI Startup
+
+If an older Phase 62 build panics during startup in `renderStartup`, rebuild or
+update before retrying. The affected build assumed a focused textarea always
+returned a cursor; terminals may legitimately report blur before the first
+frame. Current builds hide the terminal cursor while blurred and restore it on
+focus.
+
+For a source checkout:
+
+```powershell
+make verify
+go build -trimpath -o dist\recomphamr.exe .\cmd\recomphamr
+.\dist\recomphamr.exe
+```
+
+If a current build still panics, preserve the complete `Caught panic` stack and
+report the executable SHA-256 from `Get-FileHash`.
+
 ## LLM Streaming
 
 If a model stalls after the HTTP request succeeds, set a larger inter-frame

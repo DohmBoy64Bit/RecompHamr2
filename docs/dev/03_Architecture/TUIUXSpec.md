@@ -239,3 +239,92 @@ Gloss profile completion. Deterministic tests cover ASCII/`NO_COLOR`, ANSI16,
 ANSI256, and truecolor at every supported breakpoint, enforce line-width and
 cursor bounds, and retain non-color state signals. CJK, combining marks, long
 models, and long composers are included in the matrix.
+
+## Phase 53 Manual Acceptance Correction
+
+User review rejected the earlier Phase 53 render as visually complete. The
+release layout now uses one bounded chat lane: transcript, optional overlay,
+composer, runtime feedback, and key help are measured together. Overlays consume
+transcript space and stay directly above the composer. The command lane does not
+move when palette content or transcript length changes.
+
+Transcript blocks show each semantic label once. Prefixes such as `user:` and
+`assistant:` are removed from bodies when the block label already communicates
+that class. Routine `running prompt` state is not conversation history;
+actionable runtime feedback appears once in the command lane. Every overlay row
+and detail line is display-width bounded.
+
+Startup uses an original two-tone block wordmark at 80 columns and above, with
+compact text below that breakpoint. Neutral text carries ordinary content;
+semantic colors are reserved for emphasis. Automated terminal screenshots are
+not visual acceptance evidence. Phase 53 requires user-captured screenshots
+from the rebuilt Windows executable for startup, palette, and active transcript.
+
+## Phase 55 Replacement Contract
+
+### Authoritative State Ownership
+
+| Concern | Sole owner | App boundary |
+|---|---|---|
+| Composer value, placeholder, focus, cursor, edit, paste, wrap | Bubbles `textarea.Model` | submit intent contains a copied final value |
+| Transcript content, viewport, follow and wheel/page scrolling | Bubbles `viewport.Model` | app sends redacted semantic transcript messages |
+| Command/model/skill/MCP/help filtering and selection | Bubbles `list.Model` | selection emits one typed intent |
+| Footer bindings | Bubbles `help.Model` and `key.Binding` | no side effects |
+| Terminal size, profile and focus | top-level Bubble Tea model | Bubble Tea messages only |
+| Model/tool/MCP/config/memory/skill execution | `internal/app` and domain packages | immutable snapshot and result messages |
+
+No string, offset, index, cursor, focus flag, or filter value is mirrored in a
+second custom field. The TUI never polls a previous action. A user gesture emits
+an `IntentMsg` command; the app handles that message once and returns immutable
+runtime or transcript messages.
+
+### Screen Geometry
+
+- Wide (121+ columns): centered content lane capped at 112 cells.
+- Standard (80-120): content lane uses terminal width minus eight cells.
+- Narrow (60-79): content lane uses terminal width minus four cells; branding
+  collapses and modal detail is shortened before identifiers are truncated.
+- Minimum supported size is 60x18. Smaller terminals show only required size
+  and clean-exit help.
+- Startup groups identity, domain, composer, runtime row, up to three hints, and
+  one conditional tip. It has no transcript viewport.
+- Chat assigns remaining height to the viewport and fixes overlay, composer,
+  feedback, and help at the bottom. Opening an overlay reduces viewport height.
+- Command palette matches composer width and sits directly above it. Model,
+  skill, MCP, and help lists use a centered modal capped at 72x18.
+
+### Interaction Decisions
+
+- Placeholder is a textarea property and is never a value.
+- Printable `/` enters the textarea and opens the command list. Enter with bare
+  `/` accepts the selected command; if no selection exists it does nothing.
+- Enter submits ordinary non-empty text. Shift+Enter and Ctrl+J insert newline.
+- Esc closes the active overlay first, then clears transient status; it never
+  erases composer text.
+- Up/Down navigate an open list, multiline textarea rows, or prompt history in
+  that priority order. Page and wheel events belong only to the viewport.
+- Ctrl+C cancels active work. While idle, two presses arm and confirm quit.
+  Ctrl+D exits cleanly.
+
+### Visual Rationale
+
+The replacement keeps the broad command-first hierarchy because it prioritizes
+the primary job without dashboard clutter. It improves the prior design with a
+compact custom wordmark, one cyan focus rail, neutral body text, orange identity
+and action emphasis, and semantic warning/success/blocked tokens. Borders are
+limited to modal containment. These choices preserve RecompHamr identity without
+copying OpenCode glyphs, exact geometry, wording, or green palette.
+
+Phase 60 implements that rationale with a RecompHamr-owned five-row block
+wordmark at 80 columns and above, a compact literal fallback below 80 columns,
+and one stable composer/transcript lane. Generic list rows are replaced by a
+visual-only delegate with a persistent `>` selection marker and `[blocked]`
+label; the official Bubbles list remains the interaction owner. Duplicate
+readiness text is removed from the composer footer.
+
+### Manual Acceptance
+
+Deterministic fixtures verify geometry only. Visual acceptance requires real
+WezTerm screenshots at startup, command palette, active chat, model picker,
+blocked state, and 80x24. A rejected screen reopens its owning phase. Automated
+capture cannot close Phase 62.

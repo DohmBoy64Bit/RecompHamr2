@@ -6,107 +6,133 @@ import (
 	"recomphamr2/internal/commands"
 )
 
-// Model is the testable terminal shell state.
-type Model struct {
-	// Transcript is the visible conversation and command output.
-	Transcript []string
-	// Env is command execution state owned by internal/commands.
+const (
+	// DefaultWidth is the deterministic wide render width.
+	DefaultWidth = 120
+	// DefaultHeight is the deterministic render height.
+	DefaultHeight = 32
+	// CompactWidth is the standard-to-narrow breakpoint.
+	CompactWidth = 80
+	// MinimumWidth is the smallest supported interactive width.
+	MinimumWidth = 60
+	// MinimumHeight is the smallest supported interactive height.
+	MinimumHeight = 18
+)
+
+// Snapshot is immutable app-owned state rendered by the TUI.
+type Snapshot struct {
+	// Env provides read-only command and picker metadata.
 	Env commands.Environment
-	// Layout stores current render metadata.
-	Layout Layout
-	// Composer is the multiline prompt buffer.
-	Composer string
-	// History stores submitted prompt text newest-last.
-	History []string
-	// HistoryIndex is the active prompt-history cursor, or len(History).
-	HistoryIndex int
-	// Attachments stores large paste chips until the next submission.
-	Attachments []Attachment
-	// Status is the footer status text.
-	Status string
-	// PaletteIndex is the selected row in the active command or modal overlay.
-	PaletteIndex int
-	// DebugEnabled controls whether redacted debug lines render.
-	DebugEnabled bool
-	// DebugLog stores redacted debug entries.
-	DebugLog []string
-	// DebugSecrets are values removed from debug output.
-	DebugSecrets []string
-	// QuitArmed records the first idle Ctrl+C in the double-press quit flow.
-	QuitArmed bool
-	// TranscriptOffset counts transcript entries below the visible window.
-	TranscriptOffset int
-	// NewOutput reports output received while transcript follow mode is paused.
-	NewOutput bool
-}
-
-// Layout contains the visible TUI state that can be rendered without Bubble Tea.
-type Layout struct {
-	// ColorProfile is the terminal color capability used for deterministic styling.
-	ColorProfile colorprofile.Profile
-	// Width is the terminal width in cells.
-	Width int
-	// Height is the terminal height in cells.
-	Height int
-	// Mode is the current UI mode label.
+	// Mode is the verified runtime mode.
 	Mode string
-	// ActiveModel is the selected model profile label.
+	// ActiveModel is the configured model profile.
 	ActiveModel string
-	// ActiveSkill is the active skill indicator.
+	// ActiveSkill is the active skill name.
 	ActiveSkill string
-	// MCPStatus is the MCP gate/status indicator.
+	// MCPStatus is the verified MCP summary.
 	MCPStatus string
-	// ContextStatus is the context-budget evidence indicator.
+	// ContextStatus is the verified context summary.
 	ContextStatus string
-	// PendingTool is the currently visible tool status.
+	// PendingTool is the active tool name or none.
 	PendingTool string
-	// MemoryStatus is the memory freshness indicator.
+	// MemoryStatus is the verified project-memory summary.
 	MemoryStatus string
+	// Status is transient app-owned feedback.
+	Status string
+	// Secrets are redacted before transcript rendering.
+	Secrets []string
 }
 
-// Event is one testable TUI update message.
-type Event struct {
-	// Key is a symbolic key constant such as KeyEnter.
-	Key string
-	// Text is inserted into the composer.
+// TranscriptKind identifies a visible transcript block.
+type TranscriptKind string
+
+const (
+	// TranscriptUser is submitted user input.
+	TranscriptUser TranscriptKind = "user"
+	// TranscriptAssistant is model output.
+	TranscriptAssistant TranscriptKind = "assistant"
+	// TranscriptTool is built-in tool output.
+	TranscriptTool TranscriptKind = "tool"
+	// TranscriptMCP is MCP tool output.
+	TranscriptMCP TranscriptKind = "mcp"
+	// TranscriptVerified is verification evidence.
+	TranscriptVerified TranscriptKind = "verified"
+	// TranscriptWarning is actionable warning output.
+	TranscriptWarning TranscriptKind = "warning"
+	// TranscriptBlocked is a blocked operation.
+	TranscriptBlocked TranscriptKind = "blocked"
+	// TranscriptUnsupported is an unsupported operation.
+	TranscriptUnsupported TranscriptKind = "unsupported"
+	// TranscriptAttachment is attachment evidence.
+	TranscriptAttachment TranscriptKind = "attachment"
+	// TranscriptNote is neutral informational output.
+	TranscriptNote TranscriptKind = "note"
+)
+
+// TranscriptEntry is one semantic transcript block.
+type TranscriptEntry struct {
+	// Kind determines the visible label and semantic style.
+	Kind TranscriptKind
+	// Text is the block body without a repeated semantic prefix.
 	Text string
-	// Paste is pasted text, converted to a chip when large or multiline.
-	Paste string
-	// Width updates Layout.Width when positive.
-	Width int
-	// Height updates Layout.Height when positive.
-	Height int
 }
 
-// Action is the side effect requested by Update.
-type Action string
-
-// IntentKind identifies an app-owned effect requested by the terminal UI.
+// IntentKind identifies an app-owned effect requested by the TUI.
 type IntentKind string
 
-// Intent carries one side-effect request from the TUI to internal/app.
-type Intent struct {
+const (
+	// IntentSubmit requests one agent prompt.
+	IntentSubmit IntentKind = "submit"
+	// IntentCommand requests one slash command.
+	IntentCommand IntentKind = "command"
+	// IntentCancel requests cancellation.
+	IntentCancel IntentKind = "cancel"
+	// IntentQuit requests clean process exit.
+	IntentQuit IntentKind = "quit"
+	// IntentModel requests a model selection.
+	IntentModel IntentKind = "model"
+	// IntentSkill requests a skill selection.
+	IntentSkill IntentKind = "skill"
+	// IntentMCP requests an MCP selection.
+	IntentMCP IntentKind = "mcp"
+)
+
+// IntentMsg carries exactly one TUI request to internal/app.
+type IntentMsg struct {
 	// Kind identifies the requested effect.
 	Kind IntentKind
-	// Value carries submitted text or a selected command/profile/server name.
+	// Value carries submitted text or a selected identifier.
 	Value string
 }
 
-// Attachment describes one large paste chip held outside the composer text.
-type Attachment struct {
-	// Name is the visible chip identifier.
-	Name string
-	// Content is the pasted text associated with the chip.
-	Content string
+// SnapshotMsg replaces the immutable app-owned render snapshot.
+type SnapshotMsg struct {
+	// Snapshot is the latest verified runtime state.
+	Snapshot Snapshot
 }
 
-// BubbleModel adapts Model to the Bubble Tea runtime without owning core logic.
-type BubbleModel struct {
-	// State is the pure TUI shell state rendered by View.
-	State Model
-	// LastAction records the latest side effect requested by Update.
-	LastAction Action
-	// LastIntent is the typed effect request produced by the latest update.
-	LastIntent Intent
-	components bubbleComponents
+// TranscriptMsg appends semantic transcript entries.
+type TranscriptMsg struct {
+	// Entries are appended in order.
+	Entries []TranscriptEntry
 }
+
+// ClearTranscriptMsg removes all visible transcript entries.
+type ClearTranscriptMsg struct{}
+
+// ColorProfileMsg selects a deterministic render profile in tests.
+type ColorProfileMsg struct {
+	// Profile is the terminal color capability.
+	Profile colorprofile.Profile
+}
+
+type overlayKind string
+
+const (
+	overlayNone     overlayKind = ""
+	overlayCommands overlayKind = "commands"
+	overlayModels   overlayKind = "models"
+	overlaySkills   overlayKind = "skills"
+	overlayMCP      overlayKind = "mcp"
+	overlayHelp     overlayKind = "help"
+)

@@ -72,8 +72,8 @@ type Runtime struct {
 	Commands commands.Environment
 	// MCP is the MCP manager wired into Commands.
 	MCP *mcp.Manager
-	// TUI is the pure terminal model ready for an interactive adapter.
-	TUI tui.Model
+	// TUI is the immutable startup snapshot consumed by the terminal frontend.
+	TUI tui.Snapshot
 }
 
 // SmokeSpec describes one deterministic interactive runtime smoke run.
@@ -110,7 +110,7 @@ type streamModel struct {
 }
 
 type liveModel struct {
-	tui.BubbleModel
+	TUI     tui.Model
 	runtime Runtime
 	model   agent.Model
 	tools   agent.ToolRunner
@@ -198,16 +198,11 @@ func ComposeRuntime(opts Options) (Runtime, error) {
 		Config:          cfg,
 		MCP:             manager,
 	}
-	model := tui.New(env)
 	profile, err := cfg.ActiveProfile()
 	if err != nil {
 		return Runtime{ProjectDir: projectDir, Config: cfg, ConfigCreated: created}, err
 	}
-	model.Layout.Mode = "ready"
-	model.Layout.ActiveModel = cfg.Active
-	model.Layout.MCPStatus = "manager wired"
-	model.Layout.ContextStatus = fmt.Sprintf("context=%d", profile.ContextSize)
-	model.Layout.MemoryStatus = memStatus
+	snapshot := tui.Snapshot{Env: env, Mode: "ready", ActiveModel: cfg.Active, ActiveSkill: "none", MCPStatus: "manager wired", ContextStatus: fmt.Sprintf("context=%d", profile.ContextSize), PendingTool: "none", MemoryStatus: memStatus}
 	return Runtime{
 		ProjectDir:    projectDir,
 		Config:        cfg,
@@ -216,7 +211,7 @@ func ComposeRuntime(opts Options) (Runtime, error) {
 		MemoryStatus:  memStatus,
 		Commands:      env,
 		MCP:           manager,
-		TUI:           model,
+		TUI:           snapshot,
 	}, nil
 }
 
@@ -228,10 +223,10 @@ func Launch(runtime Runtime, stdout io.Writer, stderr io.Writer) error {
 	}
 	runner := newToolRunner(runtime)
 	app := liveModel{
-		BubbleModel: tui.BubbleModel{State: runtime.TUI, LastAction: tui.ActionNone},
-		runtime:     runtime,
-		model:       model,
-		tools:       runner,
+		TUI:     tui.New(runtime.TUI),
+		runtime: runtime,
+		model:   model,
+		tools:   runner,
 	}
 	return runProgram(app, stdout, stderr)
 }
@@ -250,12 +245,10 @@ func RunSmoke(ctx context.Context, spec SmokeSpec) (SmokeReport, error) {
 		width = tui.DefaultWidth
 	}
 	if strings.HasPrefix(strings.TrimSpace(spec.Prompt), "/") {
-		model := runtime.TUI.Submit(spec.Prompt)
-		render := model.RenderWithLayout(tui.Layout{Width: width, Height: tui.DefaultHeight, Mode: model.Layout.Mode, ActiveModel: model.Layout.ActiveModel, ActiveSkill: model.Layout.ActiveSkill, MCPStatus: model.Layout.MCPStatus, ContextStatus: model.Layout.ContextStatus, PendingTool: model.Layout.PendingTool, MemoryStatus: model.Layout.MemoryStatus})
-		output := ""
-		if len(model.Transcript) > 0 {
-			output = model.Transcript[len(model.Transcript)-1]
-		}
+		output, env := commands.Execute(runtime.Commands, spec.Prompt)
+		snapshot := runtime.TUI
+		snapshot.Env = env
+		render := tui.Render(snapshot, []tui.TranscriptEntry{tui.ParseEntry(output)}, width, tui.DefaultHeight)
 		return SmokeReport{Render: render, CommandOutput: output}, nil
 	}
 	if spec.Model == nil || spec.RunTool == nil {
@@ -277,9 +270,11 @@ func RunSmoke(ctx context.Context, spec SmokeSpec) (SmokeReport, error) {
 		MaxToolCalls:           8,
 	}
 	messages, err := loop.Run(ctx, history)
-	model := runtime.TUI
-	model.Transcript = smokeLines(messages)
-	render := model.RenderWithLayout(tui.Layout{Width: width, Height: tui.DefaultHeight, Mode: model.Layout.Mode, ActiveModel: model.Layout.ActiveModel, ActiveSkill: model.Layout.ActiveSkill, MCPStatus: model.Layout.MCPStatus, ContextStatus: model.Layout.ContextStatus, PendingTool: model.Layout.PendingTool, MemoryStatus: model.Layout.MemoryStatus})
+	entries := make([]tui.TranscriptEntry, 0, len(messages))
+	for _, line := range smokeLines(messages) {
+		entries = append(entries, tui.ParseEntry(line))
+	}
+	render := tui.Render(runtime.TUI, entries, width, tui.DefaultHeight)
 	report := SmokeReport{Messages: messages, Render: render, Cancelled: errors.Is(err, context.Canceled)}
 	return report, err
 }
@@ -313,7 +308,7 @@ func finalFromStream(ctx context.Context, events <-chan llm.Event) (llm.Message,
 
 // Init initializes the live Bubble Tea model.
 func (m liveModel) Init() tea.Cmd {
-	return m.BubbleModel.Init()
+	return m.TUI.Init()
 }
 
 // Update translates terminal events and runs app-owned agent side effects.
@@ -321,47 +316,62 @@ func (m liveModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch typed := msg.(type) {
 	case agentResult:
 		return m.applyAgentResult(typed), nil
+	case tui.IntentMsg:
+		return m.handleIntent(typed)
 	default:
-		submitted := ""
-		if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == tui.KeyEnter {
-			submitted = strings.TrimSpace(m.BubbleModel.State.Composer)
-		}
-		updated, cmd := m.BubbleModel.Update(msg)
-		if bubble, ok := updated.(tui.BubbleModel); ok {
-			m.BubbleModel = bubble
-		}
-		switch m.BubbleModel.LastIntent.Kind {
-		case tui.IntentSubmit:
-			if submitted == "" || strings.HasPrefix(submitted, "/") {
-				return m, cmd
-			}
-			return m.startAgentTurn(submitted)
-		case tui.IntentCancel:
-			if m.cancel != nil {
-				m.cancel()
-				m.cancel = nil
-			}
-			return m, cmd
-		case tui.IntentModel:
-			m.BubbleModel.State = m.BubbleModel.State.Submit("/models " + m.BubbleModel.LastIntent.Value)
-			return m, cmd
-		case tui.IntentSkill:
-			m.BubbleModel.State = m.BubbleModel.State.Submit("/skill " + m.BubbleModel.LastIntent.Value)
-			return m, cmd
-		case tui.IntentMCP:
-			m.BubbleModel.State = m.BubbleModel.State.Submit("/mcp tools " + m.BubbleModel.LastIntent.Value)
-			return m, cmd
-		case tui.IntentQuit:
-			return m, tea.Quit
-		default:
-			return m, cmd
-		}
+		updated, cmd := m.TUI.Update(msg)
+		m.TUI = updated.(tui.Model)
+		return m, cmd
 	}
+}
+
+func (m liveModel) handleIntent(intent tui.IntentMsg) (tea.Model, tea.Cmd) {
+	switch intent.Kind {
+	case tui.IntentSubmit:
+		m = m.applyTUI(tui.TranscriptMsg{Entries: []tui.TranscriptEntry{{Kind: tui.TranscriptUser, Text: intent.Value}}})
+		return m.startAgentTurn(intent.Value)
+	case tui.IntentCommand:
+		return m.executeCommand(intent.Value), nil
+	case tui.IntentCancel:
+		if m.cancel != nil {
+			m.cancel()
+			m.cancel = nil
+		}
+		return m, nil
+	case tui.IntentModel:
+		return m.executeCommand("/models " + intent.Value), nil
+	case tui.IntentSkill:
+		return m.executeCommand("/skill " + intent.Value), nil
+	case tui.IntentMCP:
+		return m.executeCommand("/mcp tools " + intent.Value), nil
+	case tui.IntentQuit:
+		return m, tea.Quit
+	default:
+		return m, nil
+	}
+}
+
+func (m liveModel) executeCommand(text string) liveModel {
+	output, env := commands.Execute(m.runtime.Commands, text)
+	m.runtime.Commands = env
+	snapshot := m.TUI.Snapshot()
+	snapshot.Env = env
+	if strings.TrimSpace(text) == "/clear" {
+		m = m.applyTUI(tui.ClearTranscriptMsg{})
+	}
+	m = m.applyTUI(tui.SnapshotMsg{Snapshot: snapshot})
+	return m.applyTUI(tui.TranscriptMsg{Entries: []tui.TranscriptEntry{tui.ParseEntry(output)}})
+}
+
+func (m liveModel) applyTUI(msg tea.Msg) liveModel {
+	updated, _ := m.TUI.Update(msg)
+	m.TUI = updated.(tui.Model)
+	return m
 }
 
 // View renders the live Bubble Tea model.
 func (m liveModel) View() tea.View {
-	return m.BubbleModel.View()
+	return m.TUI.View()
 }
 
 // Summary renders a deterministic local launch summary.
@@ -386,7 +396,7 @@ func (r Runtime) Summary() string {
 		serverCount = len(r.MCP.AllStatus())
 	}
 	fmt.Fprintf(&b, "mcp: manager wired servers=%d autoconnect=%s\n", serverCount, autoconnectStatus(r.MCP))
-	fmt.Fprintf(&b, "tui: %s\n", r.TUI.Layout.Mode)
+	fmt.Fprintf(&b, "tui: %s\n", r.TUI.Mode)
 	fmt.Fprintf(&b, "agent: wired for interactive turns; no model call made during summary")
 	return b.String()
 }
@@ -502,15 +512,17 @@ func liveToolRunner(runtime Runtime) agent.ToolRunner {
 func (m liveModel) startAgentTurn(prompt string) (liveModel, tea.Cmd) {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
-	m.BubbleModel.State.Layout.Mode = "thinking"
-	m.BubbleModel.State.Layout.PendingTool = "agent"
-	m.BubbleModel.State.Status = "running prompt"
+	snapshot := m.TUI.Snapshot()
+	snapshot.Mode = "thinking"
+	snapshot.PendingTool = "agent"
+	snapshot.Status = "running prompt"
+	m = m.applyTUI(tui.SnapshotMsg{Snapshot: snapshot})
 	m.history = append(m.history, llm.Message{Role: "user", Content: prompt})
 	history := append([]llm.Message(nil), m.history...)
 	visibleOffset := visibleCount(history)
 	model := m.model
 	if configurable, ok := m.model.(interface{ WithTools([]llm.Tool) agent.Model }); ok {
-		model = configurable.WithTools(liveToolDefs(m.runtime, m.BubbleModel.State.Env.ActiveSkills))
+		model = configurable.WithTools(liveToolDefs(m.runtime, snapshot.Env.ActiveSkills))
 	}
 	loop := agent.Loop{
 		Model:                  model,
@@ -570,18 +582,25 @@ func (m liveModel) applyAgentResult(result agentResult) liveModel {
 		m.cancel()
 		m.cancel = nil
 	}
-	m.BubbleModel.State.Layout.PendingTool = "none"
-	m.BubbleModel.State.Layout.Mode = "ready"
+	snapshot := m.TUI.Snapshot()
+	snapshot.PendingTool = "none"
+	snapshot.Mode = "ready"
+	snapshot.Status = ""
+	var entries []tui.TranscriptEntry
 	if result.err != nil {
 		if errors.Is(result.err, context.Canceled) {
-			m.BubbleModel.State.Status = "cancelled"
+			snapshot.Status = "cancelled"
 		} else {
-			m.BubbleModel.State.Status = "blocked"
-			m.BubbleModel.State = m.BubbleModel.State.AppendRuntimeTranscript("blocked: " + result.err.Error())
+			snapshot.Status = "blocked"
+			entries = append(entries, tui.TranscriptEntry{Kind: tui.TranscriptBlocked, Text: result.err.Error()})
 		}
 	}
 	m.history = result.messages
-	m.BubbleModel.State = m.BubbleModel.State.AppendRuntimeTranscript(visibleAgentLines(result.messages, result.visibleOffset)...)
+	for _, line := range visibleAgentLines(result.messages, result.visibleOffset) {
+		entries = append(entries, tui.ParseEntry(line))
+	}
+	m = m.applyTUI(tui.SnapshotMsg{Snapshot: snapshot})
+	m = m.applyTUI(tui.TranscriptMsg{Entries: entries})
 	return m
 }
 

@@ -75,6 +75,28 @@ Observed evidence:
   `93e5c0f8dbbf90b4c1423a45f239d0f085a1a4e14e91a5aa6f0fb58df8065218`;
 - local `SHA256SUMS` verification result: `True`.
 
+## Phase 62 Replacement TUI Executable Evidence
+
+The complete Bubble Tea replacement was built and smoked locally from this
+checkout:
+
+- executable path: `E:\RecompHamr2\dist\recomphamr.exe`;
+- executable size: `14183424` bytes;
+- build timestamp: `2026-07-13T16:04:53.5790699Z`;
+- executable SHA-256:
+  `dc2a69e4e5ca64989a3aa9aae20f9072f30ded7ebb636c26caf9e1347daf98ab`;
+- `--summary` first line: `RecompHamr product runtime`;
+- `--diagnostic` first line: `recomphamr diagnostic mode`.
+
+This is local replacement-build evidence, not a new hosted release. Manual
+WezTerm visual acceptance remains pending in
+`Phase62TUIAcceptanceEvidence.md`; the published `v2.0.0` evidence below is
+unchanged.
+
+This metadata supersedes the earlier Phase 62 local binary, which panicked when
+a terminal blur event preceded its first frame. The replacement has focused
+startup/chat and app-boundary regression coverage for that message order.
+
 ## Stable Publication Evidence
 
 External publication is verified for `v2.0.0`:

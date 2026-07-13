@@ -274,3 +274,144 @@ such as terminal-based workflow, footer hints, command palettes, and agent mode
 visibility. They are not source truth for implementation details, styling, or
 copy. RecompHamr source truth remains local code, local docs, parity rows, and
 verified runtime output.
+
+## Phase 53 Layout Correction
+
+The styled renderer owns one measured frame. Chat reserves fixed rows for the
+composer, actionable feedback, and key help, then assigns remaining rows to the
+transcript and any open overlay. A palette or picker is inserted immediately
+above the composer and reduces transcript height; it is never appended beyond
+the terminal frame.
+
+Cursor coordinates are derived from the final ANSI-stripped rendered frame so
+responsive spacing, wrapped input, and overlays cannot drift from a separate
+cursor calculation. Content is bounded using terminal display width before the
+frame is padded to the active window dimensions. Routine progress remains
+command-lane feedback rather than append-only transcript content.
+
+## Phase 55 Replacement Message Flow
+
+The replacement top-level Bubble Tea model owns official Bubbles models rather
+than synchronizing them with a second domain model. UI gestures return commands
+that emit typed intent messages. `internal/app` receives those messages, invokes
+the existing backend owner, and sends immutable snapshot or transcript messages
+back through Bubble Tea Update. View reads component state and snapshots only.
+
+This contract removes mutable intent polling, parallel editor and viewport
+state, composer-derived modal state, and rendered-output cursor reconstruction.
+Custom TUI code may classify semantic transcript records and compose styled
+regions, but it may not reproduce editing, scrolling, filtering, selection,
+focus, or cursor mechanics supplied by Bubbles.
+
+## Phase 56 Implemented Architecture
+
+The previous TUI source files and golden fixtures were removed. The replacement
+`tui.Model` directly owns one Bubbles textarea, viewport, list, help model, and
+key map. App-owned state is carried by `tui.Snapshot`; semantic output arrives
+through `tui.TranscriptMsg`; user actions leave through `tui.IntentMsg` commands.
+There is no `BubbleModel`, pure composer string, `LastAction`, `LastIntent`,
+custom transcript offset, or second renderer.
+
+`internal/app.liveModel` receives intent messages in its Bubble Tea Update loop,
+executes existing backend owners exactly there, and feeds results back through
+snapshot or transcript messages. `Runtime.TUI` now stores an immutable startup
+snapshot rather than mutable widget state. The official Bubbles list dependency
+adds `github.com/sahilm/fuzzy` transitively for component-owned filtering.
+
+## Phase 57 Authoritative Composer
+
+The textarea value remains empty while its placeholder is visible. Normal
+typing, Unicode text, Backspace/Delete, movement, paste, wrapping, focus, cursor,
+and reset behavior stays in Bubbles textarea. Shift+Enter and Ctrl+J use the
+textarea insertion API for portable multiline input. History restores values
+only through textarea methods.
+
+Typing bare `/` inserts one real slash and opens the command list. Backspace on
+an empty command filter closes that list and resets the textarea, so the slash is
+immediately removable. Enter emits no intent for empty or bare-slash input.
+
+## Phase 58 Authoritative Transcript
+
+The Bubbles viewport is the sole transcript scroll and follow owner. Appends
+inspect `viewport.AtBottom`: output follows while the reader is at the bottom,
+but preserves the viewport offset and raises a `new output  PgDn to follow`
+notice while the reader is reviewing earlier content. Returning to the bottom
+clears that notice. Clearing the transcript resets both content and feedback.
+
+App messages enter as semantic `TranscriptEntry` blocks. Their bodies are
+normalized once, secrets are redacted before storage and rendering, and visible
+labels are padded before styling so ANSI sequences cannot corrupt alignment.
+Tool and MCP blocks are bounded to eleven content lines plus an explicit
+`output truncated` line. The viewport receives the final wrapped content and no
+parallel transcript offset or follow flag exists outside this model.
+
+## Phase 59 Authoritative Palettes And Pickers
+
+One Bubbles list owns filtering, selection, pagination, navigation, and empty
+states for commands, models, skills, MCP servers, and help. The shell forwards
+both key messages and asynchronous `list.FilterMatchesMsg` results to the active
+list; it does not maintain a parallel query or selected-row index. Arrow keys
+work while filtering, and arrows plus `j`/`k` work in browsing mode.
+
+The command registry is the sole command-row source. Enter on a complete
+no-argument command emits one typed command intent. `/skill-audit` and
+`/skill-new` populate the authoritative textarea for their required argument.
+Model, skill, and MCP rows emit their typed selection intent once. Help rows
+populate the selected command without executing it. Empty and blocked rows emit
+no intent, and Escape closes an overlay without modifying composer text.
+
+## Phase 60 Responsive Layout And Theme
+
+The replacement uses one measured content lane and one final canvas. Standard
+widths render an original five-row `RECOMP HAMR` block wordmark; widths below 80
+columns use a compact literal wordmark. Both include a literal product/domain
+line for monochrome output and assistive terminal readers. The startup composer
+and active-session command lane retain fixed horizontal ownership, while
+overlays consume transcript space above the composer instead of moving it.
+
+Lip Gloss `Complete` colors map every semantic token across ANSI16, ANSI256, and
+truecolor. `NO_COLOR` selects the ASCII profile before component construction.
+Selection never depends on color: picker rows retain a `>` marker after ANSI is
+removed, blocked rows include `[blocked]`, and transcript states keep literal
+labels. Lip Gloss width measurement controls padding, truncation, centering, CJK
+text, combining marks, cursor bounds, and line-width assertions. Deterministic
+tests cover 140x40, 120x32, 80x24, 60x20, and terminal-too-small layouts.
+
+## Phase 61 Runtime Integration
+
+The frontend emits exactly one `IntentMsg` for submit, command, model, skill,
+MCP, cancel, or quit. `internal/app.liveModel` is the only adapter that consumes
+those messages. It invokes command, agent, tool, MCP, cancellation, or process
+owners and returns immutable `SnapshotMsg`, semantic `TranscriptMsg`, or
+`ClearTranscriptMsg` values to the TUI. The adapter never reads or writes
+textarea, viewport, list, help, layout, cursor, or theme internals.
+
+Exact-once tests prove one prompt creates one user block and one model turn; one
+selection creates one command result; repeated cancellation calls the stored
+cancel function once; unknown intents are inert; and quit returns one Bubble Tea
+quit message. Existing fake-agent, built-in-tool, MCP-tool, blocked-result, and
+cancellation tests prove the same boundary through complete runtime workflows.
+
+## Phase 62 Release Profile Correction
+
+The RecompHamr theme and the Bubbles-owned textarea, list, filter, pagination,
+and help chrome now share one terminal capability profile. Component styles are
+reapplied when Bubble Tea reports a profile change. ANSI16 frames cannot contain
+ANSI256 or truecolor foreground sequences, ANSI256 frames cannot contain
+truecolor foreground sequences, and ASCII/`NO_COLOR` frames contain no escape
+sequences. This closes the remaining difference between semantic RecompHamr
+styles and Bubbles defaults without replacing component interaction behavior.
+
+The release executable and deterministic smoke evidence are recorded in
+`docs/dev/07_ProjectManagement/Phase62TUIAcceptanceEvidence.md`. Runtime and
+geometry verification are complete; real-terminal visual acceptance remains a
+manual user decision.
+
+### Focus-Safe Cursor Contract
+
+Bubbles textarea returns no real cursor while its model is blurred. Because the
+top-level view requests focus reporting, a terminal may send `BlurMsg` before
+the first startup frame. Startup and chat treat the component cursor as
+optional: an absent cursor produces a complete frame with the terminal cursor
+hidden, and a later `FocusMsg` restores normal cursor rendering. The renderer
+never synthesizes an editing position outside the textarea.

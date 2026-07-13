@@ -1,1108 +1,645 @@
 package tui
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 
 	"recomphamr2/internal/commands"
 )
 
-func TestSubmitAndRender(t *testing.T) {
-	model := New(commands.Environment{ProjectDir: t.TempDir()})
-	model = model.Submit("hello")
-	model = model.Submit("/help")
-	view := model.Render()
-	if !strings.Contains(view, "user: hello") || !strings.Contains(view, "/models") || !strings.Contains(view, "Build *") {
-		t.Fatalf("Render() = %q", view)
+func TestNewAndStartupRendering(t *testing.T) {
+	snapshot := testSnapshot()
+	model := New(snapshot)
+	if model.Snapshot().ActiveModel != "local" || model.ComposerValue() != "" || len(model.Entries()) != 0 {
+		t.Fatalf("new model = %#v value=%q entries=%v", model.Snapshot(), model.ComposerValue(), model.Entries())
 	}
-}
-
-func TestRenderWideLayout(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Transcript = []string{"user: inspect binary", "assistant: gather evidence"}
-	model.Layout = Layout{
-		Width:         120,
-		Mode:          "evidence",
-		ActiveModel:   "lmstudio-amd",
-		ActiveSkill:   "n64-decomp",
-		MCPStatus:     "ghidra gated",
-		ContextStatus: "42k / 131k",
-		PendingTool:   "read_file",
-		MemoryStatus:  "fresh",
+	if model.Init() == nil {
+		t.Fatal("Init did not return cursor blink")
 	}
-	view := model.Render()
-	for _, want := range []string{"user: inspect binary", "assistant: gather evidence", "Build * lmstudio-amd", "skill n64-decomp", "mcp ghidra gated", "/ commands"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("wide render missing %q:\n%s", want, view)
+	view := model.View()
+	plain := ansi.Strip(view.Content)
+	for _, want := range []string{"RECOMP", "HAMR", "evidence-backed reconstruction", "Ask RecompHamr", "local  ready"} {
+		if !strings.Contains(plain, want) {
+			t.Fatalf("startup missing %q:\n%s", want, plain)
 		}
 	}
-}
-
-func TestRenderCompactLayout(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Transcript = []string{"user: narrow"}
-	view := model.RenderWithLayout(Layout{Width: 80, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "off", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
-	for _, want := range []string{"user: narrow", "Build * local", "skill core-re", "mcp off", "/ commands"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("compact render missing %q:\n%s", want, view)
-		}
-	}
-	if strings.Contains(view, "WORKBENCH") {
-		t.Fatalf("compact render should not use the old debug-board sections:\n%s", view)
+	if view.Cursor == nil || !view.AltScreen || !view.ReportFocus || view.WindowTitle != "RecompHamr" {
+		t.Fatalf("startup view fields = %#v", view)
 	}
 }
 
-func TestDefaultLayoutAndImprovements(t *testing.T) {
-	layout := DefaultLayout()
-	if layout.Width != DefaultWidth || layout.MCPStatus != "gated" || layout.MemoryStatus != "refreshed" {
-		t.Fatalf("DefaultLayout() = %+v", layout)
+func TestBlurredStartupAndChatHideCursorWithoutPanicking(t *testing.T) {
+	model := New(testSnapshot())
+	model = updateModel(t, model, tea.BlurMsg{})
+	startup := model.View()
+	if startup.Cursor != nil || !strings.Contains(ansi.Strip(startup.Content), "RECOMP") {
+		t.Fatalf("blurred startup cursor=%#v content=%q", startup.Cursor, ansi.Strip(startup.Content))
 	}
-	improvements := Improvements()
-	if len(improvements) != 4 {
-		t.Fatalf("len(Improvements()) = %d, want 3", len(improvements))
-	}
-	for _, improvement := range improvements {
-		if strings.TrimSpace(improvement) == "" {
-			t.Fatalf("empty improvement in %v", improvements)
-		}
+
+	model = updateModel(t, model, TranscriptMsg{Entries: []TranscriptEntry{{Kind: TranscriptAssistant, Text: "ready"}}})
+	chat := model.View()
+	if chat.Cursor != nil || !strings.Contains(ansi.Strip(chat.Content), "assistant") {
+		t.Fatalf("blurred chat cursor=%#v content=%q", chat.Cursor, ansi.Strip(chat.Content))
 	}
 }
 
-func TestRenderWithLayoutDefaultWidth(t *testing.T) {
-	model := New(commands.Environment{})
-	view := model.RenderWithLayout(Layout{})
-	if !strings.Contains(view, "RECOMP HAMR") || !strings.Contains(view, "Ask RecompHamr") {
-		t.Fatalf("zero-width layout should default to wide render:\n%s", view)
+func TestUpdateMessagesAndAuthoritativeComposer(t *testing.T) {
+	model := New(testSnapshot())
+	model = updateModel(t, model, tea.WindowSizeMsg{Width: 80, Height: 24})
+	model = updateModel(t, model, tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
+	model = updateModel(t, model, ColorProfileMsg{Profile: colorprofile.ASCII})
+	snapshot := testSnapshot()
+	snapshot.Status = "verified"
+	model = updateModel(t, model, SnapshotMsg{Snapshot: snapshot})
+	model = updateModel(t, model, tea.FocusMsg{})
+	model = updateModel(t, model, tea.BlurMsg{})
+	model = updateModel(t, model, tea.FocusMsg{})
+	model = updateModel(t, model, tea.PasteMsg{Content: "paste"})
+	if model.ComposerValue() != "paste" {
+		t.Fatalf("paste value = %q", model.ComposerValue())
 	}
+	model = updateModel(t, model, tea.KeyPressMsg(tea.Key{Code: tea.KeyBackspace}))
+	if model.ComposerValue() != "past" {
+		t.Fatalf("backspace value = %q", model.ComposerValue())
+	}
+	model = updateModel(t, model, struct{}{})
+	model = updateModel(t, model, tea.MouseWheelMsg{})
 }
 
-func TestRenderStartupAndHelperTokens(t *testing.T) {
-	model := New(commands.Environment{})
-	view := model.Render()
-	for _, want := range []string{"RECOMP HAMR", "evidence-backed reconstruction", "Ask RecompHamr", "/ commands", "? help"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("startup render missing %q:\n%s", want, view)
-		}
-	}
-	if got := chip(""); got != "[unverified]" {
-		t.Fatalf("chip(empty) = %q", got)
-	}
-	if got := centerText(12, "HAMR"); got != "    HAMR" {
-		t.Fatalf("centerText = %q", got)
-	}
-	if got := centerText(3, "HAMR"); got != "HAMR" {
-		t.Fatalf("centerText narrow = %q", got)
-	}
-	if width, height := bubbleSize(Layout{Width: 10, Height: 0}); width != 40 || height != DefaultHeight {
-		t.Fatalf("bubbleSize = %d,%d", width, height)
-	}
-	if width, height := bubbleSize(Layout{}); width != DefaultWidth || height != DefaultHeight {
-		t.Fatalf("bubbleSize default = %d,%d", width, height)
-	}
-	if got := launcherPanelWidth(120); got != 84 {
-		t.Fatalf("launcherPanelWidth wide = %d", got)
-	}
-	if got := launcherPanelWidth(42); got != 38 {
-		t.Fatalf("launcherPanelWidth compact = %d", got)
-	}
-	if got := launcherPanelWidth(20); got != 36 {
-		t.Fatalf("launcherPanelWidth tiny = %d", got)
-	}
-	if got := launcherTopPadding(40); got != 6 {
-		t.Fatalf("launcherTopPadding tall = %d", got)
-	}
-	if got := launcherTopPadding(32); got != 6 {
-		t.Fatalf("launcherTopPadding exact = %d", got)
-	}
-	if got := launcherTopPadding(20); got != 4 {
-		t.Fatalf("launcherTopPadding medium = %d", got)
-	}
-	if got := launcherTopPadding(18); got != 1 {
-		t.Fatalf("launcherTopPadding short = %d", got)
-	}
-	if got := renderWidth(200); got != 110 {
-		t.Fatalf("renderWidth large = %d", got)
-	}
-	if got := renderWidth(10); got != 32 {
-		t.Fatalf("renderWidth small = %d", got)
-	}
-}
-
-func TestRenderCompactStartup(t *testing.T) {
-	model := New(commands.Environment{})
-	view := model.RenderWithLayout(Layout{Width: 72, Mode: "ready", ActiveModel: "local", ActiveSkill: "none", MCPStatus: "gated", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
-	for _, want := range []string{"RecompHamr", "RE / decomp / recomp", "Ask RecompHamr", "ready  local  ready", "/ commands"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("compact startup missing %q:\n%s", want, view)
-		}
-	}
-}
-
-func TestTranscriptBlocks(t *testing.T) {
-	lines := []string{
-		"user: hi",
-		"assistant: hello",
-		"tool: output",
-		"mcp ghidra connected",
-		"mcp: tool returned error",
-		"verification: hashes match",
-		"blocked: denied",
-		"unsupported: later",
-		"unverified: missing evidence",
-		"status: cancelled",
-		"paste: paste-1 (12 bytes)",
-		"plain note",
-	}
-	wantLabels := []string{"user", "assistant", "tool", "mcp", "mcp", "verification", "blocked", "unsupported", "unverified", "status", "attachment", "note"}
-	for i, line := range lines {
-		got := transcriptBlock(line)
-		if !strings.HasPrefix(got, wantLabels[i]) || !strings.Contains(got, line) {
-			t.Fatalf("transcriptBlock(%q) = %q", line, got)
-		}
-	}
-	model := New(commands.Environment{})
-	model.Transcript = lines
-	view := model.RenderWithLayout(Layout{Width: 80, Mode: "ready", ActiveModel: "local", ActiveSkill: "none", MCPStatus: "gated", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"})
-	for _, want := range []string{"verification verification: hashes match", "blocked     blocked: denied", "attachment  paste: paste-1", "note        plain note"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("transcript render missing %q:\n%s", want, view)
-		}
-	}
-}
-
-func TestCompleteCommand(t *testing.T) {
-	got := CompleteCommand("/mod")
-	if len(got) != 1 || got[0] != "/models" {
-		t.Fatalf("CompleteCommand() = %v, want /models", got)
-	}
-	if got := CompleteCommand("/zzz"); len(got) != 0 {
-		t.Fatalf("CompleteCommand() = %v, want none", got)
-	}
-}
-
-func TestPaletteRowsAndTabCompletion(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Composer = "/m"
-	rows := model.PaletteRows()
-	if len(rows) == 0 || !strings.Contains(rows[0], "> /models") || strings.Contains(rows[0], "usage:") {
-		t.Fatalf("PaletteRows() = %#v", rows)
-	}
-	view := model.Render()
-	if !strings.Contains(view, "Command Palette") || !strings.Contains(view, "> /models") {
-		t.Fatalf("palette render = %q", view)
-	}
-	model, action := model.Update(Event{Key: KeyTab})
-	if action != ActionNone || model.Composer != "/models " || !strings.Contains(model.Status, "completed command") {
-		t.Fatalf("tab completion action=%s model=%+v", action, model)
-	}
-	model.Composer = "/unknown"
-	model, _ = model.Update(Event{Key: KeyTab})
-	if !strings.Contains(model.Status, "unverified") {
-		t.Fatalf("tab no-match status=%q", model.Status)
-	}
-	model.Composer = "plain"
-	if rows := model.PaletteRows(); rows != nil {
-		t.Fatalf("PaletteRows(plain) = %#v", rows)
-	}
-	before := model.Composer
-	model, _ = model.Update(Event{Key: KeyTab})
-	if model.Composer != before {
-		t.Fatalf("tab plain changed composer from %q to %q", before, model.Composer)
-	}
-	model.Composer = "/help /models"
-	model, _ = model.Update(Event{Key: KeyTab})
-	if model.Composer != "/help /models" {
-		t.Fatalf("tab with suffix composer=%q", model.Composer)
-	}
-}
-
-func TestUpdateTypingSubmitAndHistory(t *testing.T) {
-	model := New(commands.Environment{})
-	model, action := model.Update(Event{Text: "hello"})
-	if action != ActionNone || model.Composer != "hello" {
-		t.Fatalf("typing action=%s composer=%q", action, model.Composer)
-	}
-	model, action = model.Update(Event{Key: KeyEnter})
-	if action != ActionSubmit || model.Composer != "" || len(model.History) != 1 || !strings.Contains(model.Render(), "user: hello") {
-		t.Fatalf("submit action=%s model=%+v view=%q", action, model, model.Render())
-	}
-	model, action = model.Update(Event{Key: KeyUp})
-	if action != ActionNone || model.Composer != "hello" {
-		t.Fatalf("history up action=%s composer=%q", action, model.Composer)
-	}
-	model, _ = model.Update(Event{Key: KeyDown})
-	if model.Composer != "" {
-		t.Fatalf("history down composer=%q, want empty", model.Composer)
-	}
-}
-
-func TestUpdateEditingResizeAndUnsupportedKey(t *testing.T) {
-	model := New(commands.Environment{})
-	model, action := model.Update(Event{Text: "ab世", Width: 70, Height: 20})
-	if action != ActionNone || model.Layout.Width != 70 || model.Layout.Height != 20 {
-		t.Fatalf("resize/type action=%s layout=%+v", action, model.Layout)
-	}
-	model, _ = model.Update(Event{Key: KeyBackspace})
-	if model.Composer != "ab" {
-		t.Fatalf("backspace composer=%q", model.Composer)
-	}
-	model, _ = model.Update(Event{Key: KeyBackspace})
-	model, _ = model.Update(Event{Key: KeyBackspace})
-	model, _ = model.Update(Event{Key: KeyBackspace})
-	if model.Composer != "" {
-		t.Fatalf("empty backspace composer=%q", model.Composer)
-	}
-	model, action = model.Update(Event{Key: "f13"})
-	if action != ActionNone || !strings.Contains(model.Status, "unsupported key") {
-		t.Fatalf("unsupported action=%s status=%q", action, model.Status)
-	}
-}
-
-func TestCancellationAndQuitKeys(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Layout.Mode = "thinking"
-	model.Layout.PendingTool = "read_file"
-	model, action := model.Update(Event{Key: KeyCtrlC})
-	if action != ActionCancel || model.Layout.Mode != "idle" || model.Layout.PendingTool != "none" || !strings.Contains(model.Render(), "cancelled") {
-		t.Fatalf("cancel action=%s model=%+v view=%q", action, model, model.Render())
-	}
-	model, action = model.Update(Event{Key: KeyCtrlC})
-	if action != ActionNone || !model.QuitArmed || !strings.Contains(model.Status, "again") {
-		t.Fatalf("quit arm action=%s model=%+v", action, model)
-	}
-	model, action = model.Update(Event{Key: KeyEsc})
-	if action != ActionNone || model.QuitArmed || model.Status != "" {
-		t.Fatalf("escape action=%s model=%+v", action, model)
-	}
-	model, _ = model.Update(Event{Key: KeyCtrlC})
-	model, action = model.Update(Event{Key: KeyCtrlC})
-	if action != ActionQuit || model.Status != "quit" {
-		t.Fatalf("double ctrl-c action=%s status=%q", action, model.Status)
-	}
-	model = New(commands.Environment{})
-	model, action = model.Update(Event{Key: KeyCtrlD})
-	if action != ActionQuit || model.Status != "quit" {
-		t.Fatalf("ctrl-d action=%s status=%q", action, model.Status)
-	}
-}
-
-func TestPasteChipsComposerPaletteAndDebug(t *testing.T) {
-	model := New(commands.Environment{})
-	model, _ = model.Update(Event{Paste: "small"})
-	if model.Composer != "small" {
-		t.Fatalf("small paste composer=%q", model.Composer)
-	}
-	model = model.Paste("line one\nline two")
-	if len(model.Attachments) != 1 || !strings.Contains(model.Render(), "[paste-1") {
-		t.Fatalf("large paste model=%+v view=%q", model, model.Render())
-	}
-	model, action := model.Update(Event{Key: KeyEnter})
-	if action != ActionSubmit || len(model.Attachments) != 0 || !strings.Contains(model.Transcript[len(model.Transcript)-1], "[paste-1") {
-		t.Fatalf("submit paste action=%s model=%+v", action, model)
-	}
-	model.Composer = "/s"
-	if got := model.Palette(); len(got) == 0 {
-		t.Fatalf("Palette() = %v, want slash matches", got)
-	}
-	model.Composer = "plain"
-	if got := model.Palette(); got != nil {
-		t.Fatalf("Palette() = %v, want nil", got)
-	}
-	model.DebugSecrets = []string{"secret"}
-	model = model.Debug("token secret")
-	if len(model.DebugLog) != 0 {
-		t.Fatalf("disabled debug log = %v", model.DebugLog)
-	}
-	model.DebugEnabled = true
-	model = model.Debug("token secret")
-	if !strings.Contains(model.Render(), "[REDACTED]") || strings.Contains(model.Render(), "token secret") {
-		t.Fatalf("debug redaction render=%q", model.Render())
-	}
-}
-
-func TestRenderMultilineComposerAndEmptySubmit(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Composer = "one\ntwo"
-	view := model.Render()
-	if !strings.Contains(view, "composer > one") || !strings.Contains(view, "two") {
-		t.Fatalf("multiline composer render=%q", view)
-	}
-	before := model
-	model, action := model.Update(Event{Key: KeyEnter})
-	if action != ActionSubmit || len(model.History) != 1 {
-		t.Fatalf("multiline submit action=%s history=%v", action, model.History)
-	}
-	empty := New(commands.Environment{})
-	empty, action = empty.Update(Event{Key: KeyEnter})
-	if action != ActionNone || len(empty.Transcript) != 0 {
-		t.Fatalf("empty submit action=%s model=%+v", action, empty)
-	}
-	if before.Composer == "" {
-		t.Fatal("test setup lost composer")
-	}
-}
-
-func TestRenderAttachmentOnlyComposer(t *testing.T) {
-	model := New(commands.Environment{}).Paste("line one\nline two")
-	view := model.Render()
-	if !strings.Contains(view, "composer > [paste-1") {
-		t.Fatalf("attachment-only composer render=%q", view)
-	}
-}
-
-func TestPromptHistoryEmptyAndClamp(t *testing.T) {
-	model := New(commands.Environment{})
-	model, _ = model.Update(Event{Key: KeyUp})
-	if model.Composer != "" {
-		t.Fatalf("empty history composer=%q", model.Composer)
-	}
-	model = model.Submit("first")
-	model = model.Submit("second")
-	model, _ = model.Update(Event{Key: KeyUp})
-	model, _ = model.Update(Event{Key: KeyUp})
-	model, _ = model.Update(Event{Key: KeyUp})
-	if model.Composer != "first" {
-		t.Fatalf("history clamp up composer=%q", model.Composer)
-	}
-	model, _ = model.Update(Event{Key: KeyDown})
-	model, _ = model.Update(Event{Key: KeyDown})
-	model, _ = model.Update(Event{Key: KeyDown})
-	if model.Composer != "" || model.HistoryIndex != len(model.History) {
-		t.Fatalf("history clamp down composer=%q index=%d", model.Composer, model.HistoryIndex)
-	}
-}
-
-func TestHelpersForPasteAndSubmission(t *testing.T) {
-	if isLargePaste(strings.Repeat("x", LargePasteThreshold-1)) {
-		t.Fatal("paste below threshold should be inline")
-	}
-	if !isLargePaste(strings.Repeat("x", LargePasteThreshold)) || !isLargePaste("a\nb") {
-		t.Fatal("large or multiline paste should be a chip")
-	}
-	if got := submissionText("", []Attachment{{Name: "paste-1", Content: "abc"}}); got != "[paste-1 3 bytes]" {
-		t.Fatalf("submissionText attachment only = %q", got)
-	}
-	if got := trimLastRune(""); got != "" {
-		t.Fatalf("trimLastRune empty = %q", got)
-	}
-}
-
-func BenchmarkRenderWideLayout(b *testing.B) {
-	model := New(commands.Environment{})
-	for i := 0; i < 200; i++ {
-		model.Transcript = append(model.Transcript, "assistant: verified evidence line")
-	}
-	model.Layout = Layout{Width: 120, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "gated", ContextStatus: "32k", PendingTool: "none", MemoryStatus: "fresh"}
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		if view := model.Render(); len(view) == 0 {
-			b.Fatal("Render returned empty view")
-		}
-	}
-}
-
-func BenchmarkRenderCompactLayout(b *testing.B) {
-	model := New(commands.Environment{})
-	for i := 0; i < 200; i++ {
-		model.Transcript = append(model.Transcript, "tool: bounded result")
-	}
-	layout := Layout{Width: 80, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "gated", ContextStatus: "32k", PendingTool: "none", MemoryStatus: "fresh"}
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		if view := model.RenderWithLayout(layout); len(view) == 0 {
-			b.Fatal("RenderWithLayout returned empty view")
-		}
-	}
-}
-
-func TestBubbleModelAdapter(t *testing.T) {
-	bubble := NewBubble(commands.Environment{})
-	if cmd := bubble.Init(); cmd != nil {
-		t.Fatalf("Init() = %v, want nil", cmd)
-	}
-	updated, cmd := bubble.Update(tea.WindowSizeMsg{Width: 72, Height: 24})
+func TestSubmitCommandPromptHistoryAndSlashSafety(t *testing.T) {
+	model := New(testSnapshot())
+	model, cmd := updateKey(model, keyCode(tea.KeyEnter))
 	if cmd != nil {
-		t.Fatalf("Update(window) cmd = %v, want nil", cmd)
+		t.Fatal("empty submit emitted intent")
 	}
-	bubble = updated.(BubbleModel)
-	if bubble.State.Layout.Width != 72 || bubble.State.Layout.Height != 24 || bubble.LastAction != ActionNone {
-		t.Fatalf("window update bubble=%+v", bubble)
+	model, _ = updateKey(model, keyText("/"))
+	if model.overlay != overlayCommands || model.ComposerValue() != "/" {
+		t.Fatalf("slash state overlay=%q value=%q", model.overlay, model.ComposerValue())
 	}
-	updated, _ = bubble.Update(keyText("h"))
-	bubble = updated.(BubbleModel)
-	if bubble.State.Composer != "h" {
-		t.Fatalf("rune update composer=%q", bubble.State.Composer)
+	model, _ = updateKey(model, keyCode(tea.KeyBackspace))
+	if model.overlay != overlayNone || model.ComposerValue() != "" {
+		t.Fatalf("bare slash backspace overlay=%q value=%q", model.overlay, model.ComposerValue())
 	}
-	updated, _ = bubble.Update(keyCode(tea.KeyEnter))
-	bubble = updated.(BubbleModel)
-	if bubble.LastAction != ActionSubmit || !strings.Contains(bubble.View().Content, "user: h") {
-		t.Fatalf("enter update bubble=%+v view=%q", bubble, bubble.View().Content)
+	model, _ = updateKey(model, keyText("/"))
+	model.closeOverlay()
+	model, cmd = updateKey(model, keyCode(tea.KeyEnter))
+	if cmd != nil {
+		t.Fatal("bare slash emitted command")
 	}
-	updated, _ = bubble.Update(struct{}{})
-	if updated.(BubbleModel).LastAction != bubble.LastAction {
-		t.Fatalf("ignored message changed action: before=%s after=%s", bubble.LastAction, updated.(BubbleModel).LastAction)
+	model.composer.SetValue("/doctor")
+	model, cmd = updateKey(model, keyCode(tea.KeyEnter))
+	assertIntent(t, cmd, IntentCommand, "/doctor")
+	model.composer.SetValue("hello")
+	model, cmd = updateKey(model, keyCode(tea.KeyEnter))
+	assertIntent(t, cmd, IntentSubmit, "hello")
+	model.recall(-1)
+	if model.ComposerValue() != "hello" {
+		t.Fatalf("history previous = %q", model.ComposerValue())
 	}
-	if key := bubbleKey("home"); key != "home" {
-		t.Fatalf("bubbleKey(home) = %q", key)
-	}
-	if key := bubbleKey("tab"); key != KeyTab {
-		t.Fatalf("bubbleKey(tab) = %q", key)
-	}
-}
-
-func TestBubbleTeaV2StyledViewFieldsAndPaste(t *testing.T) {
-	bubble := NewBubble(commands.Environment{})
-	bubble.State.Composer = "/m"
-	view := bubble.View()
-	if !view.AltScreen || view.MouseMode != tea.MouseModeNone || !view.ReportFocus || view.WindowTitle != "RecompHamr" {
-		t.Fatalf("view fields not set for Bubble Tea v2: %+v", view)
-	}
-	if view.Cursor == nil || view.Cursor.Shape != tea.CursorBar || !view.Cursor.Blink {
-		t.Fatalf("cursor not configured: %+v", view.Cursor)
-	}
-	if view.Cursor.X <= 0 || view.Cursor.Y <= 0 {
-		t.Fatalf("startup cursor should land in launcher composer, got %+v", view.Cursor)
-	}
-	if !strings.Contains(view.Content, "\x1b[") || !strings.Contains(view.Content, "COMMAND PALETTE") {
-		t.Fatalf("styled content missing ANSI or palette:\n%q", view.Content)
-	}
-	updated, _ := bubble.Update(tea.PasteMsg{Content: "line one\nline two"})
-	bubble = updated.(BubbleModel)
-	if len(bubble.State.Attachments) != 1 || !strings.Contains(bubble.State.Render(), "paste-1") {
-		t.Fatalf("paste message did not create chip: %+v", bubble.State)
+	model.recall(-10)
+	model.recall(1)
+	model.recall(10)
+	if model.ComposerValue() != "" {
+		t.Fatalf("history end = %q", model.ComposerValue())
 	}
 }
 
-func TestBubbleTeaStartupLayoutIsAnchored(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Layout = Layout{Width: 120, Height: 32, Mode: "ready", ActiveModel: "lmstudio-amd", ActiveSkill: "none", MCPStatus: "manager wired", ContextStatus: "context=32768", PendingTool: "none", MemoryStatus: "fresh"}
-	view := model.RenderStyled()
-	plain := stripANSI(view)
-	if strings.HasPrefix(plain, "\n\n\n\n\n\n\n") {
-		t.Fatalf("startup layout has excessive top drift:\n%q", plain[:80])
+func TestTextareaOwnsMultilinePasteAndCursor(t *testing.T) {
+	model := New(testSnapshot())
+	if model.ComposerValue() != "" || !strings.Contains(ansi.Strip(model.View().Content), "Ask RecompHamr") {
+		t.Fatal("placeholder became textarea value")
 	}
-	for _, want := range []string{"RECOMP HAMR", "evidence-backed reconstruction", "Ask RecompHamr", "ready  lmstudio-amd  ready", "? help"} {
-		if !strings.Contains(plain, want) {
-			t.Fatalf("startup layout missing %q:\n%s", want, plain)
-		}
+	model = updateModel(t, model, tea.PasteMsg{Content: "alpha βeta"})
+	model, _ = updateKey(model, tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter, Mod: tea.ModShift}))
+	model, _ = updateKey(model, keyText("second"))
+	if !strings.Contains(model.ComposerValue(), "\n") || !strings.Contains(model.ComposerValue(), "second") {
+		t.Fatalf("multiline value=%q", model.ComposerValue())
 	}
-	bubble := BubbleModel{State: model}
-	teaView := bubble.View()
-	if teaView.Cursor == nil || teaView.Cursor.Y != launcherTopPadding(model.Layout.Height)+3 {
-		t.Fatalf("startup cursor = %+v", teaView.Cursor)
+	before := model.composer.Cursor().Position
+	model, _ = updateKey(model, keyCode(tea.KeyLeft))
+	after := model.composer.Cursor().Position
+	if before == after {
+		t.Fatalf("cursor did not move: before=%v after=%v", before, after)
 	}
-	compact := stripANSI(model.RenderStyledWithLayout(Layout{Width: 72, Height: 24, Mode: "ready", ActiveModel: "local", ActiveSkill: "none", MCPStatus: "gated", ContextStatus: "ok", PendingTool: "none", MemoryStatus: "fresh"}))
-	if !strings.Contains(compact, brandCompact) || strings.Contains(compact, brandWide) {
-		t.Fatalf("compact styled startup brand mismatch:\n%s", compact)
+	model, _ = updateKey(model, keyCtrl('j'))
+	if strings.Count(model.ComposerValue(), "\n") < 2 {
+		t.Fatalf("ctrl+j did not insert newline: %q", model.ComposerValue())
 	}
+}
+
+func TestOverlaySelectionCompletionAndDismissal(t *testing.T) {
+	model := New(testSnapshot())
+	model.openOverlay(overlayCommands)
+	model.picker.Select(0)
+	updated, cmd := model.acceptSelection()
+	model = updated.(Model)
+	assertIntent(t, cmd, IntentCommand, "/clear")
+
 	for _, tc := range []struct {
-		name   string
-		layout Layout
+		name string
+		kind overlayKind
 	}{
-		{"wide", model.Layout},
-		{"80x24", Layout{Width: 80, Height: 24, Mode: "ready", ActiveModel: "local", PendingTool: "none", MemoryStatus: "fresh"}},
-		{"60col", Layout{Width: 60, Height: 20, Mode: "ready", ActiveModel: "local", PendingTool: "none", MemoryStatus: "fresh"}},
+		{"/models", overlayModels},
+		{"/skills", overlaySkills},
+		{"/skill", overlaySkills},
+		{"/mcp", overlayMCP},
+		{"/help", overlayHelp},
 	} {
-		got := startupGolden(stripANSI(model.RenderStyledWithLayout(tc.layout)))
-		want, err := os.ReadFile(filepath.Join("testdata", "startup_"+tc.name+".golden"))
-		if err != nil {
-			t.Fatal(err)
+		model.openOverlay(overlayCommands)
+		selectItem(t, &model, tc.name)
+		updated, cmd = model.acceptSelection()
+		model = updated.(Model)
+		if cmd != nil || model.overlay != tc.kind {
+			t.Fatalf("%s overlay=%q cmd=%v", tc.name, model.overlay, cmd)
 		}
-		if got != strings.TrimSpace(string(want)) {
-			t.Fatalf("%s startup golden mismatch:\n--- got ---\n%s\n--- want ---\n%s", tc.name, got, want)
-		}
 	}
-	missing := Layout{Width: 80, Height: 24, Mode: "ready", ActiveModel: "local", PendingTool: "none", MemoryStatus: "unsupported: missing"}
-	if got := stripANSI(model.RenderStyledWithLayout(missing)); !strings.Contains(got, "Tip: /init-re creates project memory.") {
-		t.Fatalf("missing-memory startup lacks actionable tip:\n%s", got)
+
+	model.openOverlay(overlayModels)
+	_ = model.picker.SetItems([]list.Item{pickerItem{name: "local", kind: IntentModel}})
+	model.picker.Select(0)
+	updated, cmd = model.acceptSelection()
+	model = updated.(Model)
+	assertIntent(t, cmd, IntentModel, "local")
+
+	model.openOverlay(overlayCommands)
+	model.picker.Select(1)
+	updated, cmd = model.completeSelection()
+	model = updated.(Model)
+	if cmd != nil || !strings.HasPrefix(model.ComposerValue(), "/models") || model.overlay != overlayNone {
+		t.Fatalf("completion value=%q overlay=%q", model.ComposerValue(), model.overlay)
 	}
-	if got := model.RenderWithLayout(missing); !strings.Contains(got, "Tip: /init-re creates project memory.") {
-		t.Fatalf("plain missing-memory startup lacks actionable tip:\n%s", got)
+
+	blocked := pickerItem{name: "blocked", description: "no", blocked: true}
+	_ = model.picker.SetItems([]list.Item{blocked})
+	model.overlay = overlayModels
+	if _, cmd = model.acceptSelection(); cmd != nil {
+		t.Fatal("blocked selection emitted intent")
 	}
-	working := Layout{Width: 80, Height: 24, Mode: "streaming", ActiveModel: "local", PendingTool: "agent", MemoryStatus: "fresh"}
-	if got := startupStatus(working); got != "streaming  local  working" {
-		t.Fatalf("working startup status = %q", got)
+	if _, cmd = model.completeSelection(); cmd != nil {
+		t.Fatal("blocked completion emitted intent")
 	}
-	working.PendingTool = "none"
-	if got := startupStatus(working); got != "streaming  local  working" {
-		t.Fatalf("streaming startup status = %q", got)
+	_ = model.picker.SetItems(nil)
+	if _, cmd = model.acceptSelection(); cmd != nil {
+		t.Fatal("empty selection emitted intent")
+	}
+	if _, cmd = model.completeSelection(); cmd != nil {
+		t.Fatal("empty completion emitted intent")
+	}
+
+	model.openOverlay(overlayHelp)
+	model, _ = updateKey(model, keyCode(tea.KeyEsc))
+	if model.overlay != overlayNone {
+		t.Fatalf("escape overlay=%q", model.overlay)
 	}
 }
 
-func startupGolden(view string) string {
-	var lines []string
-	for _, line := range strings.Split(view, "\n") {
-		line = strings.TrimSpace(line)
-		line = strings.TrimSpace(strings.TrimPrefix(line, "│"))
-		if line != "" {
-			lines = append(lines, strings.Join(strings.Fields(line), " "))
+func TestPickerKindsAndKeyboardRouting(t *testing.T) {
+	model := New(testSnapshot())
+	item := pickerItem{name: "name", description: "description"}
+	if item.Title() != "name" || item.Description() != "description" || item.FilterValue() == "" {
+		t.Fatalf("picker item=%#v", item)
+	}
+	if len(model.keys.ShortHelp()) != 3 || len(model.keys.FullHelp()) != 2 {
+		t.Fatal("help bindings incomplete")
+	}
+	for _, kind := range []overlayKind{overlayModels, overlaySkills, overlayMCP, overlayHelp, overlayNone} {
+		items := pickerItems(kind, model.snapshot)
+		if kind != overlayNone && len(items) == 0 {
+			t.Fatalf("picker %q empty", kind)
+		}
+		_ = overlayTitle(kind)
+	}
+	model.openOverlay(overlayCommands)
+	model, _ = updateKey(model, keyText("m"))
+	model, _ = updateKey(model, keyCode(tea.KeyTab))
+	model.openOverlay(overlayCommands)
+	model, _ = updateKey(model, keyCode(tea.KeyDown))
+	model, _ = updateKey(model, keyCode(tea.KeyEnter))
+	model = New(testSnapshot())
+	model, _ = updateKey(model, keyCode(tea.KeyPgUp))
+	model, _ = updateKey(model, keyCode(tea.KeyUp))
+	model, _ = updateKey(model, keyCode(tea.KeyDown))
+	model.composer.SetValue("x")
+	model, _ = updateKey(model, keyText("?"))
+	model.composer.SetValue("a\nb")
+	model, _ = updateKey(model, keyCode(tea.KeyUp))
+	model, _ = updateKey(model, keyCode(tea.KeyDown))
+	model.recall(-1)
+}
+
+type nonPickerItem string
+
+// FilterValue satisfies list.Item for the delegate rejection test.
+func (item nonPickerItem) FilterValue() string { return string(item) }
+
+func TestPickerDelegateSemanticRows(t *testing.T) {
+	model := New(testSnapshot())
+	delegate := pickerDelegate{profile: colorprofile.ASCII}
+	var output strings.Builder
+	delegate.Render(&output, model.picker, 0, pickerItem{name: "server", description: "offline", blocked: true})
+	if !strings.Contains(output.String(), "> server") || !strings.Contains(output.String(), "[blocked]") {
+		t.Fatalf("blocked delegate row=%q", output.String())
+	}
+	before := output.Len()
+	delegate.Render(&output, model.picker, 0, nonPickerItem("ignored"))
+	if output.Len() != before {
+		t.Fatalf("non-picker item rendered: %q", output.String())
+	}
+}
+
+func TestListOwnsFilteringNavigationAndEmptyState(t *testing.T) {
+	model := New(testSnapshot())
+	model.openOverlay(overlayCommands)
+	for _, character := range "doctor" {
+		updated, cmd := updateKey(model, keyText(string(character)))
+		model = updated
+		if cmd == nil {
+			t.Fatalf("filter character %q returned no command", character)
 		}
 	}
-	return strings.Join(lines, "\n")
+	model.picker.SetFilterText(model.picker.FilterValue())
+	filterCmd := model.picker.SetItems(commandItems())
+	if filterCmd == nil {
+		t.Fatal("filtered item replacement returned no filter command")
+	}
+	model = updateModel(t, model, filterCmd())
+	visible := model.picker.VisibleItems()
+	if len(visible) != 1 || visible[0].(pickerItem).name != "/doctor" {
+		t.Fatalf("filtered items=%#v filter=%q", visible, model.picker.FilterValue())
+	}
+
+	model.overlay = overlayModels
+	model.picker.SetFilterState(list.Unfiltered)
+	_ = model.picker.SetItems([]list.Item{
+		pickerItem{name: "first", kind: IntentModel},
+		pickerItem{name: "second", kind: IntentModel},
+	})
+	model.picker.Select(0)
+	model, _ = updateKey(model, keyText("j"))
+	if model.picker.SelectedItem().(pickerItem).name != "second" {
+		t.Fatalf("j navigation selected %#v", model.picker.SelectedItem())
+	}
+	model, _ = updateKey(model, keyText("k"))
+	if model.picker.SelectedItem().(pickerItem).name != "first" {
+		t.Fatalf("k navigation selected %#v", model.picker.SelectedItem())
+	}
+
+	_ = model.picker.SetItems(nil)
+	if !strings.Contains(strings.ToLower(ansi.Strip(model.picker.View())), "no items") {
+		t.Fatalf("empty picker view:\n%s", ansi.Strip(model.picker.View()))
+	}
 }
 
-func TestBubbleTeaRedesignedStyledChatStates(t *testing.T) {
-	model := New(commands.Environment{})
-	model.Transcript = []string{
-		"user: inspect",
-		"assistant: verified",
-		"tool: read_file ok",
-		"mcp ghidra connected",
-		"blocked: denied",
-		"unsupported: missing",
-		"unverified: evidence",
-	}
-	model.Composer = "/"
-	model.Status = "streaming"
-	view := model.RenderStyledWithLayout(Layout{Width: 100, Height: 28, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "wired", ContextStatus: "32k", PendingTool: "agent", MemoryStatus: "fresh"})
-	for _, want := range []string{"COMMAND PALETTE", "assistant: verified", "tool: read_file ok", "blocked: denied", "unsupported: missing", "status: streaming"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("styled chat missing %q:\n%s", want, view)
+func TestArgumentAndHelpSelectionsPopulateComposer(t *testing.T) {
+	model := New(testSnapshot())
+	for _, command := range []string{"/skill-audit", "/skill-new"} {
+		model.composer.Reset()
+		model.openOverlay(overlayCommands)
+		selectItem(t, &model, command)
+		updated, cmd := model.acceptSelection()
+		model = updated.(Model)
+		if cmd != nil || model.ComposerValue() != command+" " || model.overlay != overlayNone {
+			t.Fatalf("argument command %s value=%q overlay=%q cmd=%v", command, model.ComposerValue(), model.overlay, cmd)
 		}
 	}
-	if !strings.Contains(view, "\x1b[") {
-		t.Fatalf("styled chat missing ANSI:\n%q", view)
+	if !commandNeedsInput("/skill-audit") || commandNeedsInput("/doctor") {
+		t.Fatal("command input classification failed")
 	}
-	empty := transcriptBubble(New(commands.Environment{}), 60, 4)
-	if !strings.Contains(empty, "No transcript yet") {
-		t.Fatalf("empty transcript bubble = %q", empty)
-	}
-	if got := transcriptCard("user: "+strings.Repeat("x", 50), 20, true); lipgloss.Width(got) != 20 {
-		t.Fatalf("compact transcriptCard width=%d text=%q", lipgloss.Width(got), got)
-	}
-	model.Composer = "/m"
-	if small := paletteBubble(model, 36); !strings.Contains(small, "COMMAND PALETTE") {
-		t.Fatalf("small palette = %q", small)
-	}
-	if styledDefault := model.RenderStyledWithLayout(Layout{}); !strings.Contains(styledDefault, "COMMAND PALETTE") {
-		t.Fatalf("styled default layout missing palette:\n%s", styledDefault)
-	}
-	model.Composer = ""
-	tiny := model.RenderStyledWithLayout(Layout{Width: 72, Height: 4, Mode: "run", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "wired", ContextStatus: "32k", PendingTool: "agent", MemoryStatus: "fresh"})
-	if !strings.Contains(tiny, "needs a larger terminal") || !strings.Contains(tiny, "required 60x18") {
-		t.Fatalf("tiny styled chat missing size diagnostic:\n%s", tiny)
-	}
-	if got := renderWidth(0); got != 110 {
-		t.Fatalf("renderWidth zero = %d", got)
+
+	model.composer.Reset()
+	model.openOverlay(overlayHelp)
+	selectItem(t, &model, "/doctor")
+	updated, cmd := model.acceptSelection()
+	model = updated.(Model)
+	if cmd != nil || model.ComposerValue() != "/doctor " || model.overlay != overlayNone {
+		t.Fatalf("help selection value=%q overlay=%q cmd=%v", model.ComposerValue(), model.overlay, cmd)
 	}
 }
 
-func TestPhase48BubbleRuntimeInputAndTerminalFloor(t *testing.T) {
-	if event, ok := bubbleEvent(keyText("x")); !ok || event.Text != "x" {
-		t.Fatalf("bubbleEvent(text) = %#v, %v", event, ok)
+func TestCancellationQuitHelpAndMinimumSize(t *testing.T) {
+	model := New(testSnapshot())
+	model.snapshot.PendingTool = "agent"
+	_, cmd := updateKey(model, keyCtrl('c'))
+	assertIntent(t, cmd, IntentCancel, "")
+	model.snapshot.PendingTool = "none"
+	model.snapshot.Mode = "ready"
+	model, cmd = updateKey(model, keyCtrl('c'))
+	if cmd != nil || !model.quitArmed {
+		t.Fatal("first idle ctrl+c did not arm")
 	}
-	bubble := NewBubble(commands.Environment{})
-	updated, cmd := bubble.Update(tea.FocusMsg{})
-	bubble = updated.(BubbleModel)
-	if cmd == nil || !bubble.components.composer.Focused() {
-		t.Fatalf("focus did not reach textarea: focused=%v cmd=%v", bubble.components.composer.Focused(), cmd)
+	_, cmd = updateKey(model, keyCtrl('c'))
+	assertIntent(t, cmd, IntentQuit, "")
+	_, cmd = updateKey(model, keyCtrl('d'))
+	assertIntent(t, cmd, IntentQuit, "")
+
+	model = New(testSnapshot())
+	model, _ = updateKey(model, keyText("?"))
+	if model.overlay != overlayHelp {
+		t.Fatalf("help overlay=%q", model.overlay)
 	}
-	updated, _ = bubble.Update(tea.BlurMsg{})
-	bubble = updated.(BubbleModel)
-	if bubble.components.composer.Focused() {
-		t.Fatal("blur did not reach textarea")
-	}
-	updated, _ = bubble.Update(tea.FocusMsg{})
-	bubble = updated.(BubbleModel)
-	updated, _ = bubble.Update(keyText("ab"))
-	bubble = updated.(BubbleModel)
-	if bubble.State.Composer != "ab" || bubble.LastIntent.Kind != IntentNone {
-		t.Fatalf("printable input failed: %+v", bubble)
-	}
-	updated, _ = bubble.Update(keyCode(tea.KeyBackspace))
-	bubble = updated.(BubbleModel)
-	if bubble.State.Composer != "a" {
-		t.Fatalf("textarea backspace failed: %q", bubble.State.Composer)
-	}
-	updated, _ = bubble.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter, Mod: tea.ModShift}))
-	bubble = updated.(BubbleModel)
-	updated, _ = bubble.Update(tea.KeyPressMsg(tea.Key{Code: 'j', Mod: tea.ModCtrl}))
-	bubble = updated.(BubbleModel)
-	if strings.Count(bubble.State.Composer, "\n") != 2 {
-		t.Fatalf("multiline fallbacks failed: %q", bubble.State.Composer)
-	}
-	updated, _ = bubble.Update(keyCode(tea.KeyUp))
-	bubble = updated.(BubbleModel)
-	if bubble.State.Composer == "" {
-		t.Fatal("multiline cursor key cleared textarea")
+	model.closeOverlay()
+	model.snapshot.Status = "notice"
+	model.quitArmed = true
+	model, _ = updateKey(model, keyCode(tea.KeyEsc))
+	if model.snapshot.Status != "" || model.quitArmed {
+		t.Fatalf("escape status=%q armed=%v", model.snapshot.Status, model.quitArmed)
 	}
 
-	empty := NewBubble(commands.Environment{})
-	updated, _ = empty.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelUp}))
-	empty = updated.(BubbleModel)
-	if empty.components.transcript.YOffset() != 0 {
-		t.Fatal("empty transcript wheel changed viewport")
+	model.width, model.height = 59, 17
+	model.resize()
+	if !strings.Contains(model.View().Content, "needs at least") || model.View().Cursor != nil {
+		t.Fatalf("minimum view=%q", model.View().Content)
 	}
-	updated, _ = empty.Update(keyCode(tea.KeyPgUp))
-	empty = updated.(BubbleModel)
-	if empty.components.transcript.YOffset() != 0 {
-		t.Fatal("empty transcript page changed viewport")
+	model, cmd = updateKey(model, keyText("x"))
+	if cmd != nil {
+		t.Fatal("small terminal accepted text")
 	}
+	_, cmd = updateKey(model, keyCtrl('d'))
+	assertIntent(t, cmd, IntentQuit, "")
+}
 
-	chat := NewBubble(commands.Environment{})
-	for i := 0; i < 40; i++ {
-		chat.State.Transcript = append(chat.State.Transcript, "assistant: line")
+func TestTranscriptViewportClassificationAndRendering(t *testing.T) {
+	model := New(testSnapshot())
+	model.snapshot.Secrets = []string{"secret"}
+	entries := []TranscriptEntry{
+		{Kind: TranscriptUser, Text: "user: hello secret"},
+		{Kind: TranscriptAssistant, Text: "assistant: answer"},
+		{Kind: TranscriptTool, Text: "tool output"},
+		{Kind: TranscriptMCP, Text: "mcp output"},
+		{Kind: TranscriptVerified, Text: "verified fact"},
+		{Kind: TranscriptWarning, Text: "warning"},
+		{Kind: TranscriptBlocked, Text: "blocked"},
+		{Kind: TranscriptUnsupported, Text: "unsupported"},
+		{Kind: TranscriptAttachment, Text: "file.bin"},
+		{Kind: TranscriptNote, Text: strings.Repeat("long ", 40)},
 	}
-	chat.components.syncFromState(chat.State)
-	chat.components.transcript.GotoBottom()
-	before := chat.components.transcript.YOffset()
-	updated, _ = chat.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelUp}))
-	chat = updated.(BubbleModel)
-	if chat.components.transcript.YOffset() >= before {
-		t.Fatalf("wheel did not scroll transcript: before=%d after=%d", before, chat.components.transcript.YOffset())
+	model = updateModel(t, model, TranscriptMsg{Entries: entries})
+	if len(model.Entries()) != len(entries) || strings.Contains(model.Entries()[0].Text, "secret") || strings.HasPrefix(model.Entries()[0].Text, "user:") {
+		t.Fatalf("entries=%#v", model.Entries())
 	}
-	updated, _ = chat.Update(keyCode(tea.KeyPgDown))
-	chat = updated.(BubbleModel)
-	if chat.View().MouseMode != tea.MouseModeCellMotion {
-		t.Fatal("chat with wheel support did not request mouse capture")
+	if model.View().MouseMode != tea.MouseModeCellMotion {
+		t.Fatalf("chat mouse mode=%v", model.View().MouseMode)
 	}
-
-	tooSmall := NewBubble(commands.Environment{})
-	tooSmall.State.Layout = Layout{Width: 59, Height: 17}
-	view := tooSmall.View()
-	if view.Cursor != nil || !strings.Contains(view.Content, "current 59x17") || !terminalTooSmall(tooSmall.State.Layout) {
-		t.Fatalf("terminal floor view invalid: %+v", view)
+	model = updateModel(t, model, tea.MouseWheelMsg{Button: tea.MouseWheelUp})
+	model = updateModel(t, model, keyCode(tea.KeyPgUp))
+	for index := 0; index < 30; index++ {
+		model = updateModel(t, model, TranscriptMsg{Entries: []TranscriptEntry{{Kind: TranscriptNote, Text: "scroll history"}}})
 	}
-	if terminalTooSmall(Layout{Width: MinimumWidth, Height: MinimumHeight}) {
-		t.Fatal("minimum supported size was rejected")
+	model.transcript.GotoTop()
+	model = updateModel(t, model, TranscriptMsg{Entries: []TranscriptEntry{{Kind: TranscriptAssistant, Text: "new while paused"}}})
+	if !model.newOutput || !strings.Contains(ansi.Strip(model.View().Content), "new output  PgDn to follow") {
+		t.Fatalf("paused follow state newOutput=%v\n%s", model.newOutput, ansi.Strip(model.View().Content))
+	}
+	model.transcript.GotoBottom()
+	model = updateModel(t, model, keyCode(tea.KeyPgDown))
+	if model.newOutput {
+		t.Fatal("new-output notice remained at bottom")
+	}
+	model = updateModel(t, model, TranscriptMsg{})
+	model = updateModel(t, model, ClearTranscriptMsg{})
+	if len(model.Entries()) != 0 || model.newOutput {
+		t.Fatalf("clear entries=%v newOutput=%v", model.Entries(), model.newOutput)
 	}
 }
 
-func TestPhase47ComponentsAndTypedIntents(t *testing.T) {
-	components := newBubbleComponents()
-	if len(components.keys.ShortHelp()) != 3 || len(components.keys.FullHelp()) != 2 {
-		t.Fatalf("key help is incomplete: short=%v full=%v", components.keys.ShortHelp(), components.keys.FullHelp())
+func TestTranscriptBoundsLabelsAndProfile(t *testing.T) {
+	lines := make([]string, 20)
+	for index := range lines {
+		lines[index] = "line"
 	}
-	state := New(commands.Environment{})
-	state.Composer = "unicode 界"
-	components.syncFromState(state)
-	if components.composer.Value() != state.Composer || components.composer.Width() <= 0 || components.help.Width() != state.Layout.Width {
-		t.Fatalf("startup component sync failed: composer=%q width=%d help=%d", components.composer.Value(), components.composer.Width(), components.help.Width())
+	entries := []TranscriptEntry{
+		{Kind: TranscriptUser, Text: "hello"},
+		{Kind: TranscriptTool, Text: strings.Join(lines, "\n")},
+		{Kind: TranscriptMCP, Text: strings.Join(lines, "\n")},
 	}
-	state.Transcript = []string{"assistant: verified"}
-	state.Status = "ready"
-	state.Layout.Height = 7
-	components.syncFromState(state)
-	if !strings.Contains(components.transcript.GetContent(), "assistant") || !strings.Contains(components.transcript.GetContent(), "status") || components.transcript.Height() != 3 {
-		t.Fatalf("chat component sync failed: %q", components.transcript.GetContent())
+	plain := ansi.Strip(renderTranscript(entries, 80, colorprofile.ASCII))
+	if !strings.Contains(plain, "user        hello") || strings.Count(plain, "output truncated") != 2 {
+		t.Fatalf("bounded transcript:\n%s", plain)
 	}
-	var zero bubbleComponents
-	zero.syncFromState(state)
-	if !zero.initialized {
-		t.Fatal("zero component set was not initialized lazily")
+	styled := renderTranscript(entries[:1], 80, colorprofile.TrueColor)
+	if !strings.Contains(styled, "\x1b[") {
+		t.Fatalf("truecolor transcript has no styling: %q", styled)
 	}
-	cases := []struct {
-		action Action
-		kind   IntentKind
+}
+
+func TestResponsiveBranchesAndOverlayChat(t *testing.T) {
+	model := New(testSnapshot())
+	model.width, model.height = 0, 0
+	model.resize()
+	if model.width != DefaultWidth || model.height != DefaultHeight {
+		t.Fatalf("default size=%dx%d", model.width, model.height)
+	}
+	model.width = 140
+	if model.laneWidth() != 112 {
+		t.Fatalf("wide lane=%d", model.laneWidth())
+	}
+	model.width, model.height = 60, 18
+	model.openOverlay(overlayCommands)
+	model.resize()
+	model.snapshot.Status = "working"
+	model.appendTranscript([]TranscriptEntry{{Kind: TranscriptUser, Text: "hello"}})
+	view := model.View()
+	if view.Cursor != nil || !strings.Contains(ansi.Strip(view.Content), "Filter:") || !strings.Contains(ansi.Strip(view.Content), "working") {
+		t.Fatalf("overlay chat view:\n%s", ansi.Strip(view.Content))
+	}
+	model.closeOverlay()
+	model.profile = colorprofile.ASCII
+	if strings.Contains(model.View().Content, "\x1b[") {
+		t.Fatalf("ASCII view contains ANSI: %q", model.View().Content)
+	}
+	model = New(testSnapshot())
+	model.snapshot.MemoryStatus = "missing"
+	if !strings.Contains(ansi.Strip(model.View().Content), "/init-re") {
+		t.Fatal("missing-memory tip absent")
+	}
+	canvas := []string{""}
+	putBlock(canvas, -2, 0, "a\nb\nc")
+	putBlock(canvas, 2, 0, "outside")
+	_ = wrapText("a", 0)
+}
+
+func TestResponsiveFramesColorProfilesAndUnicode(t *testing.T) {
+	sizes := []struct {
+		width  int
+		height int
 	}{
-		{ActionNone, IntentNone},
-		{ActionSubmit, IntentSubmit},
-		{ActionCancel, IntentCancel},
-		{ActionQuit, IntentQuit},
+		{140, 40}, {120, 32}, {80, 24}, {60, 20}, {59, 17},
 	}
-	for _, tc := range cases {
-		intent := intentFromAction(tc.action, "payload")
-		if intent.Kind != tc.kind || (tc.action == ActionSubmit && intent.Value != "payload") {
-			t.Fatalf("intentFromAction(%q) = %+v", tc.action, intent)
+	for _, size := range sizes {
+		model := New(testSnapshot())
+		model.width, model.height = size.width, size.height
+		model.resize()
+		view := model.View()
+		plain := ansi.Strip(view.Content)
+		if got := strings.Count(plain, "\n") + 1; got != size.height {
+			t.Fatalf("%dx%d frame height=%d", size.width, size.height, got)
+		}
+		for row, line := range strings.Split(plain, "\n") {
+			if lipgloss.Width(line) > size.width {
+				t.Fatalf("%dx%d row %d width=%d: %q", size.width, size.height, row, lipgloss.Width(line), line)
+			}
+		}
+		if view.Cursor != nil && (view.Cursor.X < 0 || view.Cursor.X >= size.width || view.Cursor.Y < 0 || view.Cursor.Y >= size.height) {
+			t.Fatalf("%dx%d cursor=%#v", size.width, size.height, view.Cursor)
 		}
 	}
-}
 
-func TestPhase42OverlayModalsAndSelection(t *testing.T) {
-	customDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(customDir, "custom.md"), []byte("# Custom\nUse this skill when custom work is needed.\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	model := New(commands.Environment{CustomSkillsDir: customDir, ActiveSkills: []string{"custom"}})
-	for _, tc := range []struct {
-		composer string
-		title    string
-		want     string
-	}{
-		{"/models", "MODEL PICKER", "config is not loaded"},
-		{"/skills", "SKILL PICKER", "custom"},
-		{"/skill custom", "SKILL PICKER", "custom"},
-		{"/mcp", "MCP CONTROLS", "ghidra"},
-		{"/help", "HELP", "Ctrl+D"},
-	} {
-		model.Composer = tc.composer
-		plain := stripANSI(model.RenderStyledWithLayout(Layout{Width: 100, Height: 28, Mode: "ready", ActiveModel: "local", ActiveSkill: "custom", MCPStatus: "gated", ContextStatus: "32k", MemoryStatus: "fresh", PendingTool: "none"}))
-		if !strings.Contains(plain, tc.title) || !strings.Contains(plain, tc.want) {
-			t.Fatalf("overlay %s missing title/want:\n%s", tc.composer, plain)
-		}
-		if title := overlayTitle(model.overlayKind()); title != tc.title {
-			t.Fatalf("overlayTitle(%s) = %q", tc.composer, title)
-		}
-	}
-	if rows := model.overlayRows(); len(rows) == 0 {
-		t.Fatal("help overlay rows missing")
-	}
-	model.Composer = "/"
-	model, _ = model.Update(Event{Key: KeyDown})
-	model, _ = model.Update(Event{Key: KeyTab})
-	if model.Composer != "/models " || !strings.Contains(model.Status, "/models") {
-		t.Fatalf("selected tab completion composer=%q status=%q", model.Composer, model.Status)
-	}
-	model.PaletteIndex = 99
-	model.Composer = "/m"
-	model = model.completeComposer()
-	if model.Composer != "/models " {
-		t.Fatalf("out-of-range tab completion composer=%q", model.Composer)
-	}
-	model.Composer = "/skills"
-	model.PaletteIndex = 0
-	model, _ = model.Update(Event{Key: KeyDown})
-	if model.PaletteIndex != 1 {
-		t.Fatalf("modal down index=%d", model.PaletteIndex)
-	}
-	model.PaletteIndex = len(model.overlayRows()) - 1
-	model, _ = model.Update(Event{Key: KeyDown})
-	if model.PaletteIndex != len(model.overlayRows())-1 {
-		t.Fatalf("modal down clamp index=%d", model.PaletteIndex)
-	}
-	model.PaletteIndex = 1
-	model, _ = model.Update(Event{Key: KeyUp})
-	model, _ = model.Update(Event{Key: KeyUp})
-	if model.PaletteIndex != 0 {
-		t.Fatalf("modal up clamp index=%d", model.PaletteIndex)
-	}
-	model.Composer = "/zz"
-	if rows := model.PaletteRows(); len(rows) != 0 {
-		t.Fatalf("unknown command palette rows=%v", rows)
-	}
-	model.Composer = "/models"
-	if rows := model.PaletteRows(); rows != nil {
-		t.Fatalf("model modal should not return command palette rows=%v", rows)
-	}
-	if empty := overlayBubble(Model{}, "commands", nil, 0, 60); !strings.Contains(empty, "unverified: no matches") {
-		t.Fatalf("empty overlay = %q", empty)
-	}
-	paletteModel := New(commands.Environment{})
-	paletteModel.Composer = "/"
-	paletteModel.PaletteIndex = 10
-	if got := stripANSI(overlayBubble(paletteModel, "commands", paletteModel.PaletteRows(), 10, 120)); !strings.Contains(got, "usage:") {
-		t.Fatalf("scrolled command overlay lacks selected detail: %q", got)
-	}
-	paletteModel.PaletteIndex = 99
-	if got := paletteModel.paletteDetail(); !strings.Contains(got, "usage:") {
-		t.Fatalf("out-of-range palette detail = %q", got)
-	}
-	paletteModel.Composer = "/zz"
-	if got := paletteModel.paletteDetail(); got != "" {
-		t.Fatalf("no-match palette detail = %q", got)
-	}
-	_ = overlayBubble(Model{}, "models", []string{" row"}, -1, 70)
-	_ = overlayBubble(Model{}, "models", []string{" row"}, 0, 100)
-	_ = overlayBubble(Model{}, "models", []string{"! blocked unavailable"}, -1, 80)
-	bubble := NewBubble(commands.Environment{})
-	bubble.State.Composer = "/"
-	updated, _ := bubble.Update(keyText("j"))
-	bubble = updated.(BubbleModel)
-	if bubble.State.PaletteIndex != 1 {
-		t.Fatalf("j palette index = %d", bubble.State.PaletteIndex)
-	}
-	updated, _ = bubble.Update(keyText("k"))
-	if updated.(BubbleModel).State.PaletteIndex != 0 {
-		t.Fatalf("k palette index = %d", updated.(BubbleModel).State.PaletteIndex)
-	}
-	for _, tc := range []struct {
-		composer string
-		kind     IntentKind
-	}{
-		{"/skills", IntentSkill},
-		{"/mcp", IntentMCP},
-	} {
-		picker := NewBubble(commands.Environment{})
-		picker.State.Composer = tc.composer
-		updated, _ := picker.Update(keyCode(tea.KeyEnter))
-		got := updated.(BubbleModel)
-		if got.LastIntent.Kind != tc.kind || got.LastIntent.Value == "" || got.State.Composer != "" {
-			t.Fatalf("%s picker intent = %+v composer=%q", tc.composer, got.LastIntent, got.State.Composer)
-		}
-	}
-	blocked := New(commands.Environment{})
-	blocked.Composer = "/models"
-	if _, ok := blocked.selectedOverlayIntent(); ok {
-		t.Fatal("blocked model row emitted intent")
-	}
-	help := New(commands.Environment{})
-	help.Composer = "/help"
-	if _, ok := help.selectedOverlayIntent(); ok {
-		t.Fatal("help overlay emitted selection intent")
-	}
-	if _, ok := selectedRowName(nil, 0); ok {
-		t.Fatal("empty rows selected a value")
-	}
-	if name, ok := selectedRowName([]string{" model ready"}, 99); !ok || name != "model" {
-		t.Fatalf("out-of-range selected row = %q, %v", name, ok)
-	}
-	if _, ok := selectedRowName([]string{""}, 0); ok {
-		t.Fatal("blank row selected a value")
-	}
-	if got := intentKindForOverlay("models"); got != IntentModel {
-		t.Fatalf("model intent kind = %q", got)
-	}
-	plain := overlayPlain("mcp", []string{"* ghidra connected tools 1"}, Layout{Width: 80})
-	if !strings.Contains(plain, "Mcp Controls") || !strings.Contains(plain, "ghidra") {
-		t.Fatalf("plain overlay = %q", plain)
-	}
-}
-
-func TestPhase42BlockedOverlayRows(t *testing.T) {
-	model := New(commands.Environment{CustomSkillsDir: string(rune(0))})
-	for _, composer := range []string{"/skills", "/models"} {
-		model.Composer = composer
-		view := stripANSI(model.RenderStyledWithLayout(Layout{Width: 96, Height: 24, Mode: "ready", ActiveModel: "local", ActiveSkill: "none", MCPStatus: "error", ContextStatus: "32k", MemoryStatus: "fresh", PendingTool: "none"}))
-		if !strings.Contains(view, "blocked") && !strings.Contains(view, "config is not loaded") {
-			t.Fatalf("blocked overlay %s missing blocked evidence:\n%s", composer, view)
-		}
-	}
-}
-
-func TestPhase43TranscriptRuntimeStatesAndRedaction(t *testing.T) {
-	model := New(commands.Environment{})
-	model.DebugSecrets = []string{"secret-token"}
-	model.Transcript = []string{
-		"user: map function with secret-token",
-		"assistant: working from evidence",
-		"tool: powershell completed",
-		"mcp: ghidra.decompile returned",
-		"verification: local checks passed",
-		"blocked: permission denied",
-		"unsupported: remote metrics unavailable",
-		"unverified: context header missing",
-	}
-	model.Status = "streaming verification without metrics secret-token"
-	plain := model.RenderWithLayout(Layout{Width: 100, Height: 28, Mode: "streaming", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "wired", ContextStatus: "32k", MemoryStatus: "fresh", PendingTool: "powershell"})
-	for _, want := range []string{"user        user: map function", "assistant   assistant: working", "tool        tool: powershell", "mcp         mcp: ghidra", "verification verification:", "blocked     blocked:", "unsupported unsupported:", "unverified  unverified:", "status      status: streaming verification"} {
-		if !strings.Contains(plain, want) {
-			t.Fatalf("runtime transcript missing %q:\n%s", want, plain)
-		}
-	}
-	if strings.Contains(plain, "secret-token") || !strings.Contains(plain, "[REDACTED]") {
-		t.Fatalf("transcript redaction failed:\n%s", plain)
-	}
-	for _, fake := range []string{"$0.", " tokens", "ms", "Thought:"} {
-		if strings.Contains(plain, fake) {
-			t.Fatalf("transcript contains fake metric marker %q:\n%s", fake, plain)
-		}
-	}
-	styled := stripANSI(model.RenderStyledWithLayout(Layout{Width: 100, Height: 28, Mode: "verifying", ActiveModel: "local", ActiveSkill: "core-re", MCPStatus: "wired", ContextStatus: "32k", MemoryStatus: "fresh", PendingTool: "doctor"}))
-	if strings.Contains(styled, "secret-token") || !strings.Contains(styled, "verification: local checks passed") || !strings.Contains(styled, "status: streaming verification") {
-		t.Fatalf("styled runtime state render failed:\n%s", styled)
-	}
-}
-
-func TestPhase51TranscriptFollowBoundingAndRuntimeFeedback(t *testing.T) {
-	model := New(commands.Environment{})
-	model.DebugSecrets = []string{"phase51-secret"}
-	for i := 0; i < 20; i++ {
-		model = model.AppendRuntimeTranscript(fmt.Sprintf("assistant: evidence %02d", i))
-	}
-	model = model.scrollTranscript(6)
-	before := model.TranscriptOffset
-	model = model.AppendRuntimeTranscript("tool: powershell\n" + strings.Repeat("long phase51-secret line\n", 14))
-	if !model.NewOutput || model.TranscriptOffset != before+1 {
-		t.Fatalf("paused append offset=%d new=%v", model.TranscriptOffset, model.NewOutput)
-	}
-	view := stripANSI(model.RenderStyledWithLayout(Layout{Width: 80, Height: 24, Mode: "run", ActiveModel: "local", PendingTool: "powershell"}))
-	for _, want := range []string{"new output", "PgDn to follow"} {
-		if !strings.Contains(view, want) {
-			t.Fatalf("scrolled transcript missing %q:\n%s", want, view)
-		}
-	}
-	model = model.scrollTranscript(-999)
-	if model.TranscriptOffset != 0 || model.NewOutput {
-		t.Fatalf("follow restore offset=%d new=%v", model.TranscriptOffset, model.NewOutput)
-	}
-	bounded := boundedTranscriptBlock("tool: powershell\n"+strings.Repeat("output line\n", 14), 30)
-	if !strings.Contains(bounded, "output truncated") || lipgloss.Width(strings.Split(bounded, "\n")[0]) > 22 {
-		t.Fatalf("bounded tool output = %q", bounded)
-	}
-	if got := boundedTranscriptBlock("note", 10); got != "note        note" {
-		t.Fatalf("narrow bounded note = %q", got)
-	}
-	if got := transcriptBlock("warning: verify symbols"); !strings.HasPrefix(got, "warning") {
-		t.Fatalf("warning block = %q", got)
-	}
-	if got := stripANSI(styleTranscriptLine("warning: verify symbols", 60)); !strings.Contains(got, "warning") {
-		t.Fatalf("warning style = %q", got)
-	}
-	if got := visibleTranscriptWindow([]string{"a", "b"}, 5, 99); len(got) != 0 {
-		t.Fatalf("overscrolled window = %v", got)
-	}
-	if got := visibleTranscriptWindow([]string{"a", "b", "c"}, 2, 0); strings.Join(got, "") != "bc" {
-		t.Fatalf("follow window = %v", got)
-	}
-	empty := New(commands.Environment{})
-	empty = empty.AppendRuntimeTranscript()
-	empty = empty.scrollTranscript(5)
-	if empty.TranscriptOffset != 0 {
-		t.Fatalf("empty scroll offset = %d", empty.TranscriptOffset)
-	}
-	bubble := NewBubble(commands.Environment{})
-	bubble.State = model
-	bubble.State.TranscriptOffset = 4
-	updated, _ := bubble.Update(keyCode(tea.KeyPgUp))
-	bubble = updated.(BubbleModel)
-	if bubble.State.TranscriptOffset <= 4 {
-		t.Fatalf("page up did not move from follow: %d", bubble.State.TranscriptOffset)
-	}
-	bubble.State.TranscriptOffset = 4
-	updated, _ = bubble.Update(keyCode(tea.KeyPgDown))
-	bubble = updated.(BubbleModel)
-	if bubble.State.TranscriptOffset >= 4 {
-		t.Fatalf("page down did not approach follow: %d", bubble.State.TranscriptOffset)
-	}
-	updated, _ = bubble.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
-	if updated.(BubbleModel).State.TranscriptOffset != 0 {
-		t.Fatalf("wheel down did not restore follow: %d", updated.(BubbleModel).State.TranscriptOffset)
-	}
-	bubble.State.Layout.Height = 2
-	bubble.State.TranscriptOffset = 1
-	updated, _ = bubble.Update(keyCode(tea.KeyPgDown))
-	if updated.(BubbleModel).State.TranscriptOffset != 0 {
-		t.Fatalf("short page delta did not clamp: %d", updated.(BubbleModel).State.TranscriptOffset)
-	}
-	bubble.State.TranscriptOffset = 1
-	updated, _ = bubble.Update(keyCode(tea.KeyPgUp))
-	if updated.(BubbleModel).State.TranscriptOffset != 2 {
-		t.Fatalf("short page-up delta = %d", updated.(BubbleModel).State.TranscriptOffset)
-	}
-	if got := transcriptBubble(model, 60, 2); got == "" {
-		t.Fatal("short transcript bubble is empty")
-	}
-	goldenModel := New(commands.Environment{})
-	goldenModel.Transcript = []string{
-		"user: map function", "assistant: evidence found", "tool: powershell verified",
-		"mcp: ghidra connected", "verification: hashes match", "warning: inspect relocation",
-		"blocked: permission denied", "unsupported: provider metric", "paste: paste-1 (20 bytes)",
-	}
-	golden := runtimeGolden(stripANSI(goldenModel.RenderStyledWithLayout(Layout{Width: 80, Height: 32, Mode: "ready", ActiveModel: "local", PendingTool: "none"})))
-	want, err := os.ReadFile(filepath.Join("testdata", "runtime_states.golden"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if golden != strings.TrimSpace(string(want)) {
-		t.Fatalf("runtime golden mismatch:\n--- got ---\n%s\n--- want ---\n%s", golden, want)
-	}
-}
-
-func TestPhase52ResponsiveThemeAccessibilityAndUnicode(t *testing.T) {
 	profiles := []struct {
-		name    string
 		profile colorprofile.Profile
+		marker  string
 	}{
-		{"no-color", colorprofile.ASCII},
-		{"ansi16", colorprofile.ANSI},
-		{"ansi256", colorprofile.ANSI256},
-		{"truecolor", colorprofile.TrueColor},
+		{colorprofile.ASCII, ""},
+		{colorprofile.ANSI, "\x1b["},
+		{colorprofile.ANSI256, "38;5;"},
+		{colorprofile.TrueColor, "38;2;"},
 	}
-	var profileEvidence []string
-	model := New(commands.Environment{})
-	model.Composer = "解析 e\u0301vidence"
-	model.Transcript = []string{"user: 解析 e\u0301vidence", "assistant: verified symbols", "warning: inspect relocation"}
-	for _, size := range []Layout{{Width: 120, Height: 32}, {Width: 96, Height: 28}, {Width: 80, Height: 24}, {Width: 60, Height: 20}, {Width: 60, Height: 18}} {
-		for _, profile := range profiles {
-			size.ColorProfile = profile.profile
-			size.Mode, size.ActiveModel, size.PendingTool = "ready", strings.Repeat("local-model-", 8), "none"
-			view := model.RenderStyledWithLayout(size)
-			plain := stripANSI(view)
-			for lineNumber, line := range strings.Split(plain, "\n") {
-				if width := lipgloss.Width(line); width > size.Width {
-					t.Fatalf("%s %dx%d line %d width=%d: %q", profile.name, size.Width, size.Height, lineNumber, width, line)
-				}
-			}
-			if !strings.Contains(plain, "解析") || !strings.Contains(plain, "warning") {
-				t.Fatalf("%s %dx%d lost Unicode/state label:\n%s", profile.name, size.Width, size.Height, plain)
-			}
-			switch profile.profile {
-			case colorprofile.ASCII:
-				if strings.Contains(view, "[38;") || strings.Contains(view, "[48;") {
-					t.Fatalf("no-color render contains color sequence: %q", view)
-				}
-				if size.Width == 80 {
-					profileEvidence = append(profileEvidence, "no-color: labels+rail+reverse; color=none")
-				}
-			case colorprofile.ANSI:
-				if strings.Contains(view, "38;5") || strings.Contains(view, "38;2") || strings.Contains(view, "48;5") || strings.Contains(view, "48;2") {
-					t.Fatalf("ANSI16 render contains extended color: %q", view)
-				}
-				if size.Width == 80 {
-					profileEvidence = append(profileEvidence, "ansi16: basic-color only")
-				}
-			case colorprofile.ANSI256:
-				if !strings.Contains(view, "38;5") {
-					t.Fatalf("ANSI256 render lacks indexed color: %q", view)
-				}
-				if size.Width == 80 {
-					profileEvidence = append(profileEvidence, "ansi256: indexed-color")
-				}
-			case colorprofile.TrueColor:
-				if !strings.Contains(view, "38;2") {
-					t.Fatalf("truecolor render lacks RGB color: %q", view)
-				}
-				if size.Width == 80 {
-					profileEvidence = append(profileEvidence, "truecolor: rgb-color")
-				}
-			}
+	for _, tc := range profiles {
+		model := New(testSnapshot())
+		model = updateModel(t, model, ColorProfileMsg{Profile: tc.profile})
+		content := model.View().Content
+		if tc.profile == colorprofile.ASCII && strings.Contains(content, "\x1b[") {
+			t.Fatalf("ASCII content contains ANSI: %q", content)
+		}
+		if tc.marker != "" && !strings.Contains(content, tc.marker) {
+			t.Fatalf("profile %v missing %q", tc.profile, tc.marker)
 		}
 	}
-	wantProfiles, err := os.ReadFile(filepath.Join("testdata", "color_profiles.golden"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.Join(profileEvidence, "\n"); got != strings.TrimSpace(string(wantProfiles)) {
-		t.Fatalf("color profile golden mismatch:\n%s", got)
-	}
+
 	t.Setenv("NO_COLOR", "1")
-	if got := DefaultLayout().ColorProfile; got != colorprofile.ASCII {
-		t.Fatalf("NO_COLOR profile = %s", got)
+	noColor := New(testSnapshot())
+	if noColor.profile != colorprofile.ASCII || strings.Contains(noColor.View().Content, "\x1b[") {
+		t.Fatalf("NO_COLOR profile=%v", noColor.profile)
 	}
-	bubble := NewBubble(commands.Environment{})
-	updated, _ := bubble.Update(tea.ColorProfileMsg{Profile: colorprofile.TrueColor})
-	bubble = updated.(BubbleModel)
-	if bubble.State.Layout.ColorProfile != colorprofile.TrueColor {
-		t.Fatalf("color profile message = %s", bubble.State.Layout.ColorProfile)
+
+	unicodeModel := New(testSnapshot())
+	unicodeModel.width, unicodeModel.height = 60, 20
+	unicodeModel.resize()
+	unicodeModel.composer.SetValue("解析 e\u0301 " + strings.Repeat("long-model-value ", 8))
+	unicodeModel.composer.MoveToEnd()
+	unicodeView := unicodeModel.View()
+	if unicodeView.Cursor == nil || unicodeView.Cursor.X >= unicodeModel.width || unicodeView.Cursor.Y >= unicodeModel.height {
+		t.Fatalf("unicode cursor=%#v", unicodeView.Cursor)
 	}
-	bubble.State.Layout.Width = 60
-	bubble.State.Layout.Height = 20
-	bubble.State.Composer = strings.Repeat("界", 80)
-	bubble.State.Transcript = []string{"user: long composer"}
-	view := bubble.View()
-	if view.Cursor == nil || view.Cursor.X < 0 || view.Cursor.X >= 60 || view.Cursor.Y < 0 || view.Cursor.Y >= 20 {
-		t.Fatalf("bounded Unicode cursor = %+v", view.Cursor)
-	}
-	tooSmall := model.RenderStyledWithLayout(Layout{Width: 59, Height: 17, ColorProfile: colorprofile.ASCII})
-	if strings.Contains(tooSmall, "[38;") || !strings.Contains(tooSmall, "required 60x18") {
-		t.Fatalf("no-color too-small state = %q", tooSmall)
-	}
-	startup := New(commands.Environment{})
-	startup.Composer = strings.Repeat("界", 80)
-	startupScreen := startup.startupScreen(Layout{Width: 60, Height: 20, ColorProfile: colorprofile.ASCII})
-	if startupScreen.cursorX < 0 || startupScreen.cursorX >= 60 {
-		t.Fatalf("bounded startup cursor = %d", startupScreen.cursorX)
+	if got := padRight("解析", 6); lipgloss.Width(got) != 6 {
+		t.Fatalf("display-width padding=%q width=%d", got, lipgloss.Width(got))
 	}
 }
 
-func runtimeGolden(view string) string {
-	var out []string
-	for _, line := range strings.Split(view, "\n") {
-		line = strings.Join(strings.Fields(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "│"))), " ")
-		for _, label := range []string{"user ", "assistant ", "tool ", "mcp ", "verification ", "warning ", "blocked ", "unsupported ", "attachment "} {
-			if strings.HasPrefix(line, label) {
-				out = append(out, line)
+func TestComponentChromeRespectsColorProfile(t *testing.T) {
+	tests := []struct {
+		name       string
+		profile    colorprofile.Profile
+		forbidden  []string
+		wantEscape bool
+	}{
+		{name: "ansi", profile: colorprofile.ANSI, forbidden: []string{"[38;5;", "[38;2;"}, wantEscape: true},
+		{name: "ansi256", profile: colorprofile.ANSI256, forbidden: []string{"[38;2;"}, wantEscape: true},
+		{name: "ascii", profile: colorprofile.ASCII, forbidden: []string{"\x1b["}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			model := New(testSnapshot())
+			model = updateModel(t, model, tea.WindowSizeMsg{Width: 120, Height: 32})
+			model = updateModel(t, model, ColorProfileMsg{Profile: test.profile})
+			model = updateModel(t, model, keyText("/"))
+			frame := model.View().Content
+			for _, forbidden := range test.forbidden {
+				if strings.Contains(frame, forbidden) {
+					t.Fatalf("frame contains forbidden profile sequence %q", forbidden)
+				}
 			}
+			if test.wantEscape && !strings.Contains(frame, "\x1b[") {
+				t.Fatal("styled profile rendered without ANSI sequences")
+			}
+		})
+	}
+}
+
+func TestParseRenderAndHelpers(t *testing.T) {
+	cases := map[string]TranscriptKind{
+		"user: x": TranscriptUser, "assistant: x": TranscriptAssistant,
+		"tool: x": TranscriptTool, "mcp: x": TranscriptMCP,
+		"verified: x": TranscriptVerified, "warning: x": TranscriptWarning,
+		"blocked: x": TranscriptBlocked, "unsupported: x": TranscriptUnsupported,
+		"attachment: x": TranscriptAttachment, "plain": TranscriptNote,
+	}
+	for input, kind := range cases {
+		if got := ParseEntry(input); got.Kind != kind || got.Text == "" {
+			t.Fatalf("ParseEntry(%q)=%#v", input, got)
 		}
 	}
-	return strings.Join(out, "\n")
+	snapshot := testSnapshot()
+	snapshot.MemoryStatus = "unsupported: missing"
+	content := Render(snapshot, []TranscriptEntry{{Kind: TranscriptAssistant, Text: "hello"}}, 80, 24)
+	for _, want := range []string{"assistant", "hello", "Ask RecompHamr"} {
+		if !strings.Contains(ansi.Strip(content), want) {
+			t.Fatalf("render missing %q:\n%s", want, ansi.Strip(content))
+		}
+	}
+	if !memoryNeedsInit("missing") || !memoryNeedsInit("unsupported") || memoryNeedsInit("verified") {
+		t.Fatal("memoryNeedsInit classification failed")
+	}
+	if readiness(Snapshot{PendingTool: "tool"}) != "working" || readiness(Snapshot{}) != "ready" || readiness(Snapshot{Mode: "idle"}) != "idle" {
+		t.Fatal("readiness failed")
+	}
+	if truncate("abcdef", 3) == "abcdef" || truncate("abc", 3) != "abc" {
+		t.Fatal("truncate failed")
+	}
+	if wrapText("abcdef", 3) == "abcdef" {
+		t.Fatal("wrapText failed")
+	}
+}
+
+func testSnapshot() Snapshot {
+	return Snapshot{
+		Env:           commands.Environment{},
+		Mode:          "ready",
+		ActiveModel:   "local",
+		ActiveSkill:   "none",
+		MCPStatus:     "manager wired",
+		ContextStatus: "context=32768",
+		PendingTool:   "none",
+		MemoryStatus:  "verified",
+	}
+}
+
+func updateModel(t *testing.T, model Model, msg tea.Msg) Model {
+	t.Helper()
+	updated, _ := model.Update(msg)
+	return updated.(Model)
+}
+
+func updateKey(model Model, key tea.KeyPressMsg) (Model, tea.Cmd) {
+	updated, cmd := model.Update(key)
+	return updated.(Model), cmd
+}
+
+func assertIntent(t *testing.T, cmd tea.Cmd, kind IntentKind, value string) {
+	t.Helper()
+	if cmd == nil {
+		t.Fatalf("missing %s intent", kind)
+	}
+	got, ok := cmd().(IntentMsg)
+	if !ok || got.Kind != kind || got.Value != value {
+		t.Fatalf("intent=%#v want kind=%s value=%q", got, kind, value)
+	}
+}
+
+func selectItem(t *testing.T, model *Model, name string) {
+	t.Helper()
+	for index, item := range model.picker.Items() {
+		if item.(pickerItem).name == name {
+			model.picker.Select(index)
+			return
+		}
+	}
+	t.Fatalf("picker item %q not found", name)
 }
 
 func keyText(text string) tea.KeyPressMsg {
@@ -1113,22 +650,6 @@ func keyCode(code rune) tea.KeyPressMsg {
 	return tea.KeyPressMsg(tea.Key{Code: code})
 }
 
-func stripANSI(text string) string {
-	var b strings.Builder
-	inEscape := false
-	for i := 0; i < len(text); i++ {
-		ch := text[i]
-		if inEscape {
-			if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') {
-				inEscape = false
-			}
-			continue
-		}
-		if ch == 0x1b {
-			inEscape = true
-			continue
-		}
-		b.WriteByte(ch)
-	}
-	return b.String()
+func keyCtrl(code rune) tea.KeyPressMsg {
+	return tea.KeyPressMsg(tea.Key{Code: code, Mod: tea.ModCtrl})
 }
